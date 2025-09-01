@@ -1,87 +1,220 @@
+import { register } from "@/services/authService";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator
-} from "react-native"
-import React, { useState } from "react"
-import { useRouter } from "expo-router"
-import { register } from "@/services/authService"
+  View,
+} from "react-native";
 
 const Register = () => {
-  const router = useRouter()
-  const [email, setEmail] = useState<string>("")
-  const [password, setPassword] = useState<string>("")
-  const [cPassword, setCPassword] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(false)
+  const router = useRouter();
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [cPassword, setCPassword] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCPassword, setShowCPassword] = useState(false);
 
   const handleRegister = async () => {
-    // if(email)
-    // password
-    if (isLoading) return
-    if (password !== cPassword) {
-      Alert.alert("Title", "description")
-      return
+    if (!email || !password || !cPassword) {
+      Alert.alert("Validation Error", "All fields are required.");
+      return;
     }
-    setIsLoading(true)
-    await register(email, password)
-      .then((res) => {
-        // const res = await register(email, password)
-        // success
-        router.back()
-      })
-      .catch((err) => {
-        Alert.alert("Registration failed", "Somthing went wrong")
-        console.error(err)
-      })
-      .finally(() => {
-        setIsLoading(false)
-      })
-  }
+
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Validation Error", "Please enter a valid email address.");
+      return;
+    }
+
+    if (password !== cPassword) {
+      Alert.alert("Validation Error", "Passwords do not match.");
+      return;
+    }
+
+    if (isLoading) return;
+    setIsLoading(true);
+
+    try {
+      await register(email, password);
+      Alert.alert("Success", "Account created successfully!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Registration Failed", "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <View className="flex-1 w-full justify-center align-items-center p-4">
-      <Text className="text-4xl text-center mb-2">Register</Text>
-      <TextInput
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        className="bg-surface border border-gray-300 rounded px-4 py-3 mb-4 text-gray-900"
-      />
-      <TextInput
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        className="bg-surface border border-gray-300 rounded px-4 py-3 mb-4 text-gray-900"
-      />
-      <TextInput
-        placeholder="Confirm password"
-        value={cPassword}
-        onChangeText={setCPassword}
-        secureTextEntry
-        className="bg-surface border border-gray-300 rounded px-4 py-3 mb-4 text-gray-900"
-      />
-      <TouchableOpacity
-        onPress={handleRegister}
-        className="bg-green-600 p-4 rounded mt-2"
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" size="large" />
-        ) : (
-          <Text className="text-center text-2xl">Register</Text>
-        )}
-      </TouchableOpacity>
-      <Pressable className="px-6 py-3" onPress={() => router.back()}>
-        <Text className="text-xl text-center text-blue-500">
-          Alrady have an account? Login
-        </Text>
-      </Pressable>
-    </View>
-  )
-}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <View style={styles.card}>
+        <Text style={styles.title}>Foundly</Text>
+        <Text style={styles.subtitle}>A Community Lost & Found App</Text>
+        <Text style={styles.sectionTitle}>Create your account</Text>
 
-export default Register
+        <TextInput
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          placeholderTextColor="#9CA3AF"
+          style={styles.input}
+        />
+
+        <View style={styles.passwordContainer}>
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            placeholderTextColor="#9CA3AF"
+            style={styles.input}
+          />
+          <Pressable
+            style={styles.showHideButton}
+            onPress={() => setShowPassword(!showPassword)}
+          >
+            <Text style={styles.showHideText}>{showPassword ? "Hide" : "Show"}</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.passwordContainer}>
+          <TextInput
+            placeholder="Confirm Password"
+            value={cPassword}
+            onChangeText={setCPassword}
+            secureTextEntry={!showCPassword}
+            placeholderTextColor="#9CA3AF"
+            style={styles.input}
+          />
+          <Pressable
+            style={styles.showHideButton}
+            onPress={() => setShowCPassword(!showCPassword)}
+          >
+            <Text style={styles.showHideText}>{showCPassword ? "Hide" : "Show"}</Text>
+          </Pressable>
+        </View>
+
+        <TouchableOpacity onPress={handleRegister} style={styles.registerButton}>
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" size="large" />
+          ) : (
+            <Text style={styles.registerButtonText}>Sign Up</Text>
+          )}
+        </TouchableOpacity>
+
+        <Pressable onPress={() => router.back()} style={styles.loginContainer}>
+          <Text style={styles.loginText}>
+            Already have an account? <Text style={styles.loginLink}>Login</Text>
+          </Text>
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 28,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#8B5CF6",
+    marginBottom: 4,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#6B7280",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 16,
+  },
+  input: {
+    width: "100%",
+    backgroundColor: "#F3F4F6",
+    borderColor: "#D1D5DB",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 16,
+  },
+  passwordContainer: {
+    position: "relative",
+  },
+  showHideButton: {
+    position: "absolute",
+    right: 18,
+    top: 16,
+  },
+  showHideText: {
+    color: "#8B5CF6",
+    fontWeight: "600", // string instead of number
+  },
+  registerButton: {
+    width: "100%",
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  registerButtonText: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  loginContainer: {
+    alignItems: "center",
+  },
+  loginText: {
+    fontSize: 16,
+    color: "#6B7280",
+  },
+  loginLink: {
+    color: "#F59E0B",
+    fontWeight: "700",
+  },
+});
+
+export default Register;
