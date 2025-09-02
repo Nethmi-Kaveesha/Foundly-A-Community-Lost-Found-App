@@ -44,9 +44,9 @@ const Login = () => {
     try {
       const res = await login(email, password);
       setUser(res.user);
-      Alert.alert("Success", "Logged in successfully!", [
-        { text: "OK", onPress: () => router.push("/home") },
-      ]);
+
+      router.push("/home"); // Navigate immediately
+      Alert.alert("Success", "Logged in successfully!"); // Show alert after navigation
     } catch (err) {
       console.error(err);
       const error = err as { response?: { data?: { message?: string } } };
