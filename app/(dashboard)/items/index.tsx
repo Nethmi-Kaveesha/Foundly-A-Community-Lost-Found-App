@@ -152,6 +152,8 @@ const FoundlyItemsScreen = () => {
                 marginVertical: 8,
                 overflow: "hidden",
                 elevation: 3,
+                borderWidth: item.matchedItemId ? 2 : 0, // highlight matched items
+                borderColor: item.matchedItemId ? "#FBBF24" : "transparent",
               }}
             >
               {/* Image */}
@@ -159,11 +161,22 @@ const FoundlyItemsScreen = () => {
 
               {/* Content */}
               <View className="px-3 pb-3">
-                <Text className="text-base font-bold text-gray-900 text-center" numberOfLines={1}>
+                <Text
+                  className="text-base font-bold text-gray-900 text-center"
+                  numberOfLines={1}
+                >
                   {item.title}
                 </Text>
-                <Text className="text-gray-600 text-xs text-center" numberOfLines={2}>
+                <Text
+                  className="text-gray-600 text-xs text-center"
+                  numberOfLines={2}
+                >
                   {item.description}
+                </Text>
+
+                {/* Matched Status */}
+                <Text className="text-center mt-1 text-sm font-semibold text-yellow-600">
+                  {item.matchedItemId ? "⚡ Matched!" : item.status}
                 </Text>
 
                 {/* Edit/Delete Buttons (owner only) */}
@@ -183,6 +196,7 @@ const FoundlyItemsScreen = () => {
                     >
                       <Text className="text-xs font-semibold text-gray-800">Edit</Text>
                     </TouchableOpacity>
+
                     <TouchableOpacity
                       style={{
                         flex: 1,
