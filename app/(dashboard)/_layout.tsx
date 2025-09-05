@@ -1,13 +1,12 @@
-import { View, Text, SafeAreaView, ActivityIndicator } from "react-native"
-import React, { useEffect } from "react"
-import { Slot, Tabs, useRouter } from "expo-router"
-import { MaterialIcons } from "@expo/vector-icons"
 import { useAuth } from "@/context/AuthContext"
+import { Ionicons, MaterialIcons } from "@expo/vector-icons"
+import { Tabs, useRouter } from "expo-router"
+import React, { useEffect } from "react"
+import { ActivityIndicator, SafeAreaView, View } from "react-native"
 
-const DashboardLayout = () => {
+const FoundlyDashboardLayout = () => {
   const { user, loading } = useAuth()
   const router = useRouter()
-  console.log("User Data :", user)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -17,8 +16,8 @@ const DashboardLayout = () => {
 
   if (loading) {
     return (
-      <View className="flex-1 w-full justify-center align-items-center">
-        <ActivityIndicator size="large" />
+      <View className="flex-1 justify-center items-center bg-white">
+        <ActivityIndicator size="large" color="#3B82F6" />
       </View>
     )
   }
@@ -28,63 +27,55 @@ const DashboardLayout = () => {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: "#2ecc71",
-          tabBarInactiveTintColor: "#2c3e50",
+          tabBarActiveTintColor: "#3B82F6", // Foundly blue
+          tabBarInactiveTintColor: "#6B7280", // Gray
           tabBarStyle: {
-            backgroundColor: "#bdc3c7"
+            backgroundColor: "#F3F4F6", // light gray
+            borderTopWidth: 0,
+            elevation: 5
           }
         }}
       >
+        {/* Home Tab */}
         <Tabs.Screen
           name="home"
           options={{
             title: "Home",
-            tabBarIcon: (data) => (
-              <MaterialIcons
-                name="home-filled"
-                size={data.size}
-                color={data.color}
-              />
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="home" size={size} color={color} />
             )
           }}
         />
+
+        {/* Items Tab (was Tasks) */}
         <Tabs.Screen
-          name="tasks"
-          // name="tasks/index"
+          name="items"
           options={{
-            title: "Task",
-            tabBarIcon: (data) => (
-              <MaterialIcons
-                name="check-circle"
-                size={data.size}
-                color={data.color}
-              />
+            title: "Items",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="inventory" size={size} color={color} />
             )
           }}
         />
+
+        {/* Profile Tab */}
         <Tabs.Screen
           name="profile"
           options={{
             title: "Profile",
-            tabBarIcon: (data) => (
-              <MaterialIcons
-                name="person"
-                size={data.size}
-                color={data.color}
-              />
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="person" size={size} color={color} />
             )
           }}
         />
+
+        {/* Settings Tab */}
         <Tabs.Screen
-          name="setting"
+          name="settings"
           options={{
-            title: "Setting",
-            tabBarIcon: (data) => (
-              <MaterialIcons
-                name="settings"
-                size={data.size}
-                color={data.color}
-              />
+            title: "Settings",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialIcons name="settings" size={size} color={color} />
             )
           }}
         />
@@ -93,4 +84,4 @@ const DashboardLayout = () => {
   )
 }
 
-export default DashboardLayout
+export default FoundlyDashboardLayout
