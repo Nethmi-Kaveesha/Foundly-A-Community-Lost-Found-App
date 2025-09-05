@@ -7,7 +7,7 @@ export interface Item {
   userId?: string           
   createdAt?: Date          
 
-  // New / optional fields
+  // Optional fields
   photoURL?: string        
   contactInfo?: string      
   location?: {              
