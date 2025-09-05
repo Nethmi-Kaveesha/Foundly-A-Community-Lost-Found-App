@@ -27,9 +27,10 @@ export const createItem = async (item: Item) => {
 // Update an existing item
 export const updateItem = async (id: string, item: Item) => {
   const docRef = doc(db, "items", id);
-  const { id: _id, ...itemData } = item; // Exclude id from Firestore update
+  const { id: _id, ...itemData } = item; // exclude id
   return await updateDoc(docRef, itemData);
 };
+
 
 // Delete an item
 export const deleteItem = async (id: string) => {
