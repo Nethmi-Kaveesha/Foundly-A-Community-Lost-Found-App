@@ -1,6 +1,8 @@
+// app/(dashboard)/items/[id].tsx
 import { useLoader } from "@/context/LoaderContext";
 import { createItem, getAllItemData, getItemById, updateItem } from "@/services/itemService";
 import { findMatchingItem } from "@/services/matchService";
+import { sendMatchNotification } from "@/services/notificationService";
 import { Item } from "@/types/item";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -20,6 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Categories
 const categories = [
   { id: "1", name: "Pets" },
   { id: "2", name: "Electronics" },
@@ -126,14 +129,14 @@ const FoundlyItemFormScreen = () => {
     try {
       showLoader();
 
-      // 1️⃣ Check for a matching item
+      // 1️⃣ Get all items to check for a match
       const allItems = await getAllItemData();
       const match = findMatchingItem(itemData, allItems);
 
       // 2️⃣ Create the new item
       const newItemId = await createItem(itemData);
 
-      // 3️⃣ If matched, update both items
+      // 3️⃣ If matched, update both items and notify
       if (match?.id) {
         // Update new item with matchedItemId
         await updateItem(newItemId, { ...itemData, matchedItemId: match.id, id: undefined });
@@ -141,6 +144,9 @@ const FoundlyItemFormScreen = () => {
         // Update existing matched item
         const updatedMatch: Item = { ...match, matchedItemId: newItemId, id: undefined };
         await updateItem(match.id, updatedMatch);
+
+        // Send notification/email to original owner
+        await sendMatchNotification(match, { ...itemData, id: newItemId });
 
         Alert.alert("Match Found!", "This item matches with an existing item.");
       }
@@ -156,6 +162,7 @@ const FoundlyItemFormScreen = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
+      {/* Header */}
       <View className="flex-row justify-between items-center px-5 py-4 bg-white shadow">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color="#3B82F6" />
@@ -164,8 +171,10 @@ const FoundlyItemFormScreen = () => {
         <View className="w-8" />
       </View>
 
+      {/* Form */}
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+
           {/* Lost / Found Toggle */}
           <View className="flex-row mb-4 bg-gray-200 rounded-xl overflow-hidden">
             {(["Lost", "Found"] as const).map((s) => (
@@ -220,6 +229,7 @@ const FoundlyItemFormScreen = () => {
           <TouchableOpacity className="bg-blue-500 rounded-2xl py-4 items-center justify-center shadow-lg" onPress={handleSubmit}>
             <Text className="text-white font-bold text-lg">{isNew ? "Add Item" : "Update Item"}</Text>
           </TouchableOpacity>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
