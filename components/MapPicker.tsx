@@ -16,18 +16,16 @@ L.Icon.Default.mergeOptions({
 
 interface MapPickerProps {
   onLocationSelect: (lat: number, lng: number) => void;
-  location?: { lat: number; lng: number }; // external location from parent
+  location?: { lat: number; lng: number };
+  markers?: { lat: number; lng: number; title: string; status: string }[]; // nearby items
   zoom?: number;
 }
 
-const MapPicker: React.FC<MapPickerProps> = ({ onLocationSelect, location, zoom = 5 }) => {
+const MapPicker: React.FC<MapPickerProps> = ({ onLocationSelect, location, markers = [], zoom = 5 }) => {
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(location || null);
 
-  // Update marker if parent location changes
   useEffect(() => {
-    if (location) {
-      setMarkerPos(location);
-    }
+    if (location) setMarkerPos(location);
   }, [location]);
 
   const LocationMarker = () => {
@@ -39,23 +37,23 @@ const MapPicker: React.FC<MapPickerProps> = ({ onLocationSelect, location, zoom 
       },
     });
 
-    // Center map if location changes externally
     useEffect(() => {
-      if (location) {
-        map.setView([location.lat, location.lng], map.getZoom());
-      }
+      if (location) map.setView([location.lat, location.lng], map.getZoom());
     }, [location]);
 
-    return markerPos ? <Marker position={markerPos} /> : null;
+    return (
+      <>
+        {markerPos && <Marker position={markerPos} />}
+        {markers.map((m, idx) => (
+          <Marker key={idx} position={{ lat: m.lat, lng: m.lng }} title={`${m.title} (${m.status})`} />
+        ))}
+      </>
+    );
   };
 
   return (
     <div style={{ height: "300px", width: "100%", marginBottom: "12px" }}>
-      <MapContainer
-        center={[location?.lat || 20, location?.lng || 77]}
-        zoom={zoom}
-        style={{ height: "100%", width: "100%" }}
-      >
+      <MapContainer center={[location?.lat || 20, location?.lng || 77]} zoom={zoom} style={{ height: "100%", width: "100%" }}>
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="&copy; OpenStreetMap contributors"
