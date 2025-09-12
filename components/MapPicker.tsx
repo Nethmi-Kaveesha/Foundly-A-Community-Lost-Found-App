@@ -17,12 +17,13 @@ L.Icon.Default.mergeOptions({
 interface MapPickerProps {
   onLocationSelect: (lat: number, lng: number) => void;
   location?: { lat: number; lng: number };
-  markers?: { lat: number; lng: number; title: string; status: string }[]; // nearby items
+  markers?: { lat: number; lng: number; title: string; status: string; id?: string }[];
   zoom?: number;
 }
 
 const MapPicker: React.FC<MapPickerProps> = ({ onLocationSelect, location, markers = [], zoom = 5 }) => {
   const [markerPos, setMarkerPos] = useState<{ lat: number; lng: number } | null>(location || null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (location) setMarkerPos(location);
@@ -51,15 +52,58 @@ const MapPicker: React.FC<MapPickerProps> = ({ onLocationSelect, location, marke
     );
   };
 
+  // Search location function using Nominatim
+  const searchLocation = async () => {
+    if (!searchQuery) return;
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`
+      );
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const { lat, lon } = data[0];
+        const latNum = parseFloat(lat);
+        const lonNum = parseFloat(lon);
+        setMarkerPos({ lat: latNum, lng: lonNum });
+        onLocationSelect(latNum, lonNum);
+      } else {
+        alert("Location not found");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error searching location");
+    }
+  };
+
   return (
-    <div style={{ height: "300px", width: "100%", marginBottom: "12px" }}>
-      <MapContainer center={[location?.lat || 20, location?.lng || 77]} zoom={zoom} style={{ height: "100%", width: "100%" }}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution="&copy; OpenStreetMap contributors"
+    <div style={{ width: "100%", marginBottom: "12px" }}>
+      {/* Search Bar */}
+      <div style={{ display: "flex", marginBottom: "8px" }}>
+        <input
+          type="text"
+          placeholder="Search location..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1px solid #ccc" }}
         />
-        <LocationMarker />
-      </MapContainer>
+        <button
+          onClick={searchLocation}
+          style={{ marginLeft: "8px", padding: "8px 12px", borderRadius: "8px", backgroundColor: "#3B82F6", color: "white" }}
+        >
+          Go
+        </button>
+      </div>
+
+      {/* Map */}
+      <div style={{ height: "300px", width: "100%" }}>
+        <MapContainer center={[location?.lat || 20, location?.lng || 77]} zoom={zoom} style={{ height: "100%", width: "100%" }}>
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors"
+          />
+          <LocationMarker />
+        </MapContainer>
+      </div>
     </div>
   );
 };
