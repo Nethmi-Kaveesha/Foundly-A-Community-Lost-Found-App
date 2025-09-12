@@ -11,7 +11,6 @@ import {
   updateDoc,
   where
 } from "firebase/firestore";
-import api from "./config/api";
 
 // Reference to Firestore collection
 export const itemColRef = collection(db, "items");
@@ -20,7 +19,10 @@ export const itemColRef = collection(db, "items");
 
 // Create a new item (Lost/Found)
 export const createItem = async (item: Item) => {
-  const docRef = await addDoc(itemColRef, item);
+  const docRef = await addDoc(itemColRef, {
+    ...item,
+    createdAt: item.createdAt || new Date(), // ensure timestamp
+  });
   return docRef.id;
 };
 
@@ -31,7 +33,6 @@ export const updateItem = async (id: string, item: Item) => {
   return await updateDoc(docRef, itemData);
 };
 
-
 // Delete an item
 export const deleteItem = async (id: string) => {
   const docRef = doc(db, "items", id);
@@ -39,7 +40,7 @@ export const deleteItem = async (id: string) => {
 };
 
 // Get all items
-export const getAllItemData = async () => {
+export const getAllItemData = async (): Promise<Item[]> => {
   const snapshot = await getDocs(itemColRef);
   const itemList = snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -49,36 +50,44 @@ export const getAllItemData = async () => {
 };
 
 // Get item by ID
-export const getItemById = async (id: string) => {
+export const getItemById = async (id: string): Promise<Item | null> => {
   const docRef = doc(db, "items", id);
   const snapshot = await getDoc(docRef);
-  const item = snapshot.exists()
-    ? ({ id: snapshot.id, ...snapshot.data() } as Item)
-    : null;
-  return item;
+  return snapshot.exists() ? ({ id: snapshot.id, ...snapshot.data() } as Item) : null;
 };
 
 // Get all items by a specific user
-export const getAllItemByUserId = async (userId: string) => {
+export const getAllItemByUserId = async (userId: string): Promise<Item[]> => {
   const q = query(itemColRef, where("userId", "==", userId));
   const snapshot = await getDocs(q);
-  const itemList = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Item[];
-  return itemList;
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Item));
 };
 
-// =================== Mock API (axios) for testing ===================
+// =================== Optional: Get items near a location ===================
+// Simple proximity filter (distance in km)
+export const getItemsNearLocation = async (
+  lat: number,
+  lng: number,
+  radiusKm: number = 5
+): Promise<Item[]> => {
+  const allItems = await getAllItemData();
+  const toRad = (x: number) => (x * Math.PI) / 180;
 
-// Fetch all items from mock API
-export const getAllItem = async () => {
-  const res = await api.get("/item");
-  return res.data;
-};
+  const distance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
-// Add item via mock API
-export const addItem = async (item: any) => {
-  const res = await api.post("/item", item);
-  return res.data;
+  return allItems.filter(
+    (item) =>
+      item.location?.lat !== undefined &&
+      item.location?.lng !== undefined &&
+      distance(lat, lng, item.location.lat, item.location.lng) <= radiusKm
+  );
 };
