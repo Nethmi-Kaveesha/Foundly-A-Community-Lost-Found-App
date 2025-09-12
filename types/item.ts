@@ -1,10 +1,10 @@
 // types/item.ts
 
-// Define a separate type for location
+// Define a type for location with lat/lng
 export interface ItemLocation {
-  address?: string;
-  latitude?: number;
-  longitude?: number;
+  address?: string;       // Optional: user-friendly address or description
+  lat?: number;           // Latitude for map
+  lng?: number;           // Longitude for map
 }
 
 // Main item interface
