@@ -1,15 +1,15 @@
-// app/(dashboard)/items/[id].tsx
 "use client";
-
 import { useLoader } from "@/context/LoaderContext";
 import { createItem, getAllItemData, getItemById, updateItem } from "@/services/itemService";
+import { sendNotification } from "@/services/loactionnotificationService";
 import { findMatchingItem } from "@/services/matchService";
-import { sendMatchNotification } from "@/services/notificationService";
+import { addNotification } from "@/services/notifyNotificationService";
 import { Item } from "@/types/item";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
+import dynamic from "next/dynamic";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -24,11 +24,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Import the MapPicker
-import dynamic from "next/dynamic";
 const MapPicker = dynamic(() => import("@/components/MapPicker"), { ssr: false });
 
-// Categories
 const categories = [
   { id: "1", name: "Pets" },
   { id: "2", name: "Electronics" },
@@ -45,9 +42,9 @@ const FoundlyItemFormScreen = () => {
   const [status, setStatus] = useState<"Lost" | "Found">("Lost");
   const [category, setCategory] = useState<string>("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationName, setLocationName] = useState("");
   const [contactInfo, setContactInfo] = useState<string>("");
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
 
   const router = useRouter();
   const { showLoader, hideLoader } = useLoader();
@@ -71,14 +68,18 @@ const FoundlyItemFormScreen = () => {
             router.replace("/(dashboard)/items");
             return;
           }
+
           setTitle(item.title);
           setDescription(item.description);
           setStatus(item.status);
           setCategory(item.category);
-          if (item.location?.lat && item.location?.lng) {
-            setLocation({ lat: item.location.lat, lng: item.location.lng });
-          }
-          setLocationName(item.location?.address || "");
+          setLocation(
+            item.location &&
+              typeof item.location.lat === "number" &&
+              typeof item.location.lng === "number"
+              ? { lat: item.location.lat, lng: item.location.lng }
+              : null
+          );
           setContactInfo(item.contactInfo || "");
           setImageUri(item.photoURL || null);
         } catch (err) {
@@ -92,7 +93,7 @@ const FoundlyItemFormScreen = () => {
     loadItem();
   }, [id, currentUser]);
 
-  // Pick image from gallery
+  // Pick image
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -100,65 +101,112 @@ const FoundlyItemFormScreen = () => {
       aspect: [4, 3],
       quality: 0.7,
     });
-
     if (!result.canceled && result.assets.length > 0) {
       setImageUri(result.assets[0].uri);
     }
   };
 
-  // Geocode typed location using OpenStreetMap Nominatim
-  const handleSetLocationFromName = async () => {
-    if (!locationName.trim()) return;
+  // Handle nearby marker click
+  const handleNearbyMarkerClick = (marker: { lat: number; lng: number; id?: string }) => {
+    const item = nearbyItems.find(
+      (i) =>
+        (marker.id && i.id === marker.id) ||
+        (i.location?.lat === marker.lat && i.location?.lng === marker.lng)
+    );
+    if (!item) return;
 
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}`
-      );
-      const data = await res.json();
-      if (data && data.length > 0) {
-        const { lat, lon } = data[0];
-        setLocation({ lat: parseFloat(lat), lng: parseFloat(lon) });
-      } else {
-        Alert.alert("Not Found", "Could not find the location");
-      }
-    } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to fetch location");
-    }
+    setTitle(item.title);
+    setDescription(item.description || "");
+    setStatus(item.status);
+    setCategory(item.category || "");
+    setContactInfo(item.contactInfo || "");
+    setImageUri(item.photoURL || null);
+    setLocation(
+      item.location &&
+        typeof item.location.lat === "number" &&
+        typeof item.location.lng === "number"
+        ? { lat: item.location.lat, lng: item.location.lng }
+        : null
+    );
   };
 
   // Submit form
   const handleSubmit = async () => {
-    if (!title.trim()) { Alert.alert("Validation", "Title is required"); return; }
-    if (!category) { Alert.alert("Validation", "Please select a category"); return; }
-    if (!currentUser) { Alert.alert("Error", "You must be logged in"); return; }
-    if (!location) { Alert.alert("Validation", "Please select a location"); return; }
+    if (!title.trim()) return Alert.alert("Validation", "Title is required");
+    if (!category) return Alert.alert("Validation", "Please select a category");
+    if (!location) return Alert.alert("Validation", "Please select a location on the map");
+    if (!currentUser) return Alert.alert("Error", "You must be logged in to add or edit items");
 
     const itemData: Item = {
       title: title.trim(),
       description: description.trim(),
       status,
       category,
-      location: { ...location, address: locationName.trim() || undefined },
+      location,
       contactInfo: contactInfo.trim() || undefined,
       photoURL: imageUri || undefined,
       userId: currentUser.uid,
+      createdAt: new Date(),
     };
 
     try {
       showLoader();
 
-      // Check for matches
       const allItems = await getAllItemData();
-      const match = findMatchingItem(itemData, allItems);
-
       const newItemId = await createItem(itemData);
 
-      if (match?.id) {
+      // Nearby users (~5km)
+      const nearby = allItems.filter(
+        (i) =>
+          i.userId !== currentUser.uid &&
+          i.location &&
+          typeof i.location.lat === "number" &&
+          typeof i.location.lng === "number" &&
+          Math.abs(i.location.lat - location.lat) < 0.05 &&
+          Math.abs(i.location.lng - location.lng) < 0.05
+      );
+      setNearbyItems(nearby);
+
+      // Notify nearby users
+      await Promise.all(
+        nearby.map((i) =>
+          sendNotification(
+            i.userId!,
+            newItemId,
+            `Nearby ${status} item!`,
+            `A ${category} titled "${title}" is near your location.`
+          )
+        )
+      );
+
+      // Check for exact match
+      const match = findMatchingItem(itemData, allItems);
+      if (match?.id && match.userId) {
         await updateItem(newItemId, { ...itemData, matchedItemId: match.id, id: undefined });
-        const updatedMatch: Item = { ...match, matchedItemId: newItemId, id: undefined };
-        await updateItem(match.id, updatedMatch);
-        await sendMatchNotification(match, { ...itemData, id: newItemId });
+        await updateItem(match.id, { ...match, matchedItemId: newItemId, id: undefined });
+
+        // Notify matched user
+        await addNotification({
+          toUserId: match.userId,
+          fromUserId: currentUser.uid,
+          title: "Match Found!",
+          message: `Your ${match.status} item "${match.title}" matches a ${status} item nearby.`,
+          type: "match",
+          itemId: match.id,
+          matchedItemId: newItemId,
+        });
+
+        // Notify current user
+        await addNotification({
+          toUserId: currentUser.uid,
+          fromUserId: match.userId,
+          title: "Match Found!",
+          message: `Your ${status} item "${title}" matches a ${match.status} item nearby.`,
+          type: "match",
+          itemId: newItemId,
+          matchedItemId: match.id,
+        });
+
         Alert.alert("Match Found!", "This item matches with an existing item.");
       }
 
@@ -173,7 +221,6 @@ const FoundlyItemFormScreen = () => {
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
-      {/* Header */}
       <View className="flex-row justify-between items-center px-5 py-4 bg-white shadow">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color="#3B82F6" />
@@ -184,12 +231,14 @@ const FoundlyItemFormScreen = () => {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-
-          {/* Lost / Found Toggle */}
+          {/* Lost / Found */}
           <View className="flex-row mb-4 bg-gray-200 rounded-xl overflow-hidden">
             {(["Lost", "Found"] as const).map((s) => (
-              <TouchableOpacity key={s} onPress={() => setStatus(s)}
-                className={`flex-1 py-3 rounded-xl ${status === s ? (s === "Lost" ? "bg-blue-500" : "bg-green-500") : ""}`}>
+              <TouchableOpacity
+                key={s}
+                onPress={() => setStatus(s)}
+                className={`flex-1 py-3 rounded-xl ${status === s ? (s === "Lost" ? "bg-blue-500" : "bg-green-500") : ""}`}
+              >
                 <Text className={`text-center font-semibold ${status === s ? "text-white" : "text-gray-700"}`}>{s}</Text>
               </TouchableOpacity>
             ))}
@@ -208,54 +257,46 @@ const FoundlyItemFormScreen = () => {
             )}
           </TouchableOpacity>
 
-          {/* Title */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Title</Text>
+          {/* Title & Description */}
           <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-4 shadow-sm" placeholder="Enter title" value={title} onChangeText={setTitle} />
-
-          {/* Description */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Description</Text>
           <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-4 shadow-sm" placeholder="Enter description" value={description} onChangeText={setDescription} multiline numberOfLines={4} />
 
           {/* Category */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Category</Text>
           <View className="flex-row flex-wrap mb-4">
             {categories.map((cat) => (
-              <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
-                className={`px-4 py-2 mr-2 mb-2 rounded-2xl border border-gray-300 shadow ${category === cat.name ? "bg-blue-500" : "bg-white"}`}>
+              <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)} className={`px-4 py-2 mr-2 mb-2 rounded-2xl border border-gray-300 shadow ${category === cat.name ? "bg-blue-500" : "bg-white"}`}>
                 <Text className={`font-semibold ${category === cat.name ? "text-white" : "text-gray-700"}`}>{cat.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* Location Name */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Location Name / Address</Text>
-          <TextInput
-            className="bg-white border border-gray-300 p-3 rounded-xl mb-2 shadow-sm"
-            placeholder="Enter location name or address"
-            value={locationName}
-            onChangeText={setLocationName}
-          />
-          <TouchableOpacity className="bg-blue-500 rounded-xl py-2 px-4 mb-4" onPress={handleSetLocationFromName}>
-            <Text className="text-white font-semibold text-center">Set on Map</Text>
-          </TouchableOpacity>
-
           {/* Map Picker */}
-          <MapPicker location={location || undefined} onLocationSelect={(lat, lng) => setLocation({ lat, lng })} />
-          {location && (
-            <Text className="text-gray-500 mt-1">
-              Selected: Lat {location.lat.toFixed(4)}, Lng {location.lng.toFixed(4)}
-            </Text>
-          )}
+          <MapPicker
+            onLocationSelect={(lat, lng) => setLocation({ lat, lng })}
+            markers={nearbyItems
+              .filter(
+                (item): item is Item & { location: { lat: number; lng: number } } => !!item.location && !!item.id && typeof item.location.lat === "number" && typeof item.location.lng === "number"
+              )
+              .map((item) => ({
+                id: item.id,
+                lat: item.location.lat,
+                lng: item.location.lng,
+                title: item.title,
+                status: item.status,
+                photoURL: item.photoURL || null,
+              }))}
+            location={location || undefined}
+            zoom={10}
+          />
+          {location && <Text className="text-gray-500 mt-1">Selected: Lat {location.lat.toFixed(4)}, Lng {location.lng.toFixed(4)}</Text>}
 
           {/* Contact Info */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Contact Info</Text>
           <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-6 shadow-sm" placeholder="Enter contact info" value={contactInfo} onChangeText={setContactInfo} />
 
-          {/* Submit Button */}
+          {/* Submit */}
           <TouchableOpacity className="bg-blue-500 rounded-2xl py-4 items-center justify-center shadow-lg" onPress={handleSubmit}>
             <Text className="text-white font-bold text-lg">{isNew ? "Add Item" : "Update Item"}</Text>
           </TouchableOpacity>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
