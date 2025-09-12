@@ -11,6 +11,7 @@ import {
   updateDoc,
   where
 } from "firebase/firestore";
+import { sendNotification } from "./loactionnotificationService"; // your notification service
 
 // Reference to Firestore collection
 export const itemColRef = collection(db, "items");
@@ -21,7 +22,7 @@ export const itemColRef = collection(db, "items");
 export const createItem = async (item: Item) => {
   const docRef = await addDoc(itemColRef, {
     ...item,
-    createdAt: item.createdAt || new Date(), // ensure timestamp
+    createdAt: item.createdAt || new Date(),
   });
   return docRef.id;
 };
@@ -64,7 +65,6 @@ export const getAllItemByUserId = async (userId: string): Promise<Item[]> => {
 };
 
 // =================== Optional: Get items near a location ===================
-// Simple proximity filter (distance in km)
 export const getItemsNearLocation = async (
   lat: number,
   lng: number,
@@ -90,4 +90,22 @@ export const getItemsNearLocation = async (
       item.location?.lng !== undefined &&
       distance(lat, lng, item.location.lat, item.location.lng) <= radiusKm
   );
+};
+
+// =================== Send notifications to nearby users ===================
+export const notifyNearbyUsers = async (item: Item, radiusKm: number = 5) => {
+  if (!item.location?.lat || !item.location?.lng || !item.userId) return;
+
+  const nearbyItems = await getItemsNearLocation(item.location.lat, item.location.lng, radiusKm);
+
+  for (const nearbyItem of nearbyItems) {
+    if (nearbyItem.userId !== item.userId) {
+      await sendNotification(
+        nearbyItem.userId || "",
+        item.id || "",
+        `Nearby ${item.status} item!`,
+        `A ${item.category} titled "${item.title}" is near your location.`
+      );
+    }
+  }
 };
