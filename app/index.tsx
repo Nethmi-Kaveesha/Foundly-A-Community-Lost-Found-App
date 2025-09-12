@@ -1,7 +1,11 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
+import "leaflet/dist/leaflet.css";
 import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
+
+import "leaflet-control-geocoder/dist/Control.Geocoder.css";
+
 
 const Index = () => {
   const router = useRouter();
