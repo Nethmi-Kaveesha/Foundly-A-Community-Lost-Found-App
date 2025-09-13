@@ -1,97 +1,49 @@
 "use client";
-import { useLoader } from "@/context/LoaderContext";
-import { createItem, getAllItemData, getItemById, updateItem } from "@/services/itemService";
-import { sendNotification } from "@/services/loactionnotificationService";
-import { findMatchingItem } from "@/services/matchService";
-import { addNotification } from "@/services/notifyNotificationService";
-import { Item } from "@/types/item";
-import { Ionicons } from "@expo/vector-icons";
+
+import type { MarkerType } from "@/components/MapPicker.types";
+import { createItem } from "@/services/itemService";
+import type { Item, ItemLocation } from "@/types/item";
 import * as ImagePicker from "expo-image-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
 import dynamic from "next/dynamic";
-import React, { useEffect, useState } from "react";
-import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useState } from "react";
+import { Alert, Image, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const MapPicker = dynamic(() => import("@/components/MapPicker"), { ssr: false });
+// Dynamically import map picker
+const MapPicker = dynamic(
+  () =>
+    Platform.OS === "web"
+      ? import("@/components/MapPickerWeb")
+      : import("@/components/MapPickerMobile"),
+  { ssr: false }
+);
 
-const categories = [
+// Categories
+const categoriesList = [
   { id: "1", name: "Pets" },
   { id: "2", name: "Electronics" },
   { id: "3", name: "Bags" },
   { id: "4", name: "Keys" },
 ];
 
-const FoundlyItemFormScreen = () => {
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const isNew = !id || id === "new";
+// Validate location
+const getValidLocation = (loc?: ItemLocation) =>
+  loc?.lat !== undefined && loc?.lng !== undefined
+    ? { lat: loc.lat, lng: loc.lng }
+    : undefined;
 
+const FoundlyItemFormScreen: React.FC = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Lost" | "Found">("Lost");
-  const [category, setCategory] = useState<string>("");
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [contactInfo, setContactInfo] = useState<string>("");
+  const [category, setCategory] = useState("");
+  const [contact, setContact] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
-  const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
+  const [itemLocation, setItemLocation] = useState<ItemLocation>({});
 
-  const router = useRouter();
-  const { showLoader, hideLoader } = useLoader();
   const auth = getAuth();
   const currentUser = auth.currentUser;
-
-  // Load existing item if editing
-  useEffect(() => {
-    const loadItem = async () => {
-      if (!isNew && id) {
-        try {
-          showLoader();
-          const item = await getItemById(id);
-          if (!item) {
-            Alert.alert("Not found", "Item not found");
-            router.replace("/(dashboard)/items");
-            return;
-          }
-          if (item.userId !== currentUser?.uid) {
-            Alert.alert("Unauthorized", "You cannot edit this item.");
-            router.replace("/(dashboard)/items");
-            return;
-          }
-
-          setTitle(item.title);
-          setDescription(item.description);
-          setStatus(item.status);
-          setCategory(item.category);
-          setLocation(
-            item.location &&
-              typeof item.location.lat === "number" &&
-              typeof item.location.lng === "number"
-              ? { lat: item.location.lat, lng: item.location.lng }
-              : null
-          );
-          setContactInfo(item.contactInfo || "");
-          setImageUri(item.photoURL || null);
-        } catch (err) {
-          console.error(err);
-          Alert.alert("Error", "Failed to load item.");
-        } finally {
-          hideLoader();
-        }
-      }
-    };
-    loadItem();
-  }, [id, currentUser]);
 
   // Pick image
   const pickImage = async () => {
@@ -106,199 +58,151 @@ const FoundlyItemFormScreen = () => {
     }
   };
 
-  // Handle nearby marker click
-  const handleNearbyMarkerClick = (marker: { lat: number; lng: number; id?: string }) => {
-    const item = nearbyItems.find(
-      (i) =>
-        (marker.id && i.id === marker.id) ||
-        (i.location?.lat === marker.lat && i.location?.lng === marker.lng)
-    );
-    if (!item) return;
-
-    setTitle(item.title);
-    setDescription(item.description || "");
-    setStatus(item.status);
-    setCategory(item.category || "");
-    setContactInfo(item.contactInfo || "");
-    setImageUri(item.photoURL || null);
-    setLocation(
-      item.location &&
-        typeof item.location.lat === "number" &&
-        typeof item.location.lng === "number"
-        ? { lat: item.location.lat, lng: item.location.lng }
-        : null
-    );
-  };
-
   // Submit form
   const handleSubmit = async () => {
     if (!title.trim()) return Alert.alert("Validation", "Title is required");
-    if (!category) return Alert.alert("Validation", "Please select a category");
-    if (!location) return Alert.alert("Validation", "Please select a location on the map");
-    if (!currentUser) return Alert.alert("Error", "You must be logged in to add or edit items");
-
-    const itemData: Item = {
-      title: title.trim(),
-      description: description.trim(),
-      status,
-      category,
-      location,
-      contactInfo: contactInfo.trim() || undefined,
-      photoURL: imageUri || undefined,
-      userId: currentUser.uid,
-      createdAt: new Date(),
-    };
+    if (!category) return Alert.alert("Validation", "Select a category");
+    if (!contact.trim()) return Alert.alert("Validation", "Enter contact number");
+    if (!getValidLocation(itemLocation)) return Alert.alert("Validation", "Select a location on the map");
+    if (!currentUser) return Alert.alert("Error", "You must be logged in");
 
     try {
-      showLoader();
+      const newItem: Item = {
+        title,
+        description,
+        status,
+        category,
+        contactInfo: contact,
+        photoURL: imageUri || undefined,
+        location: itemLocation,
+        userId: currentUser.uid,
+      };
 
-      const allItems = await getAllItemData();
-      const newItemId = await createItem(itemData);
+      const id = await createItem(newItem);
+      Alert.alert("Success", "Item posted successfully!");
 
-      // Nearby users (~5km)
-      const nearby = allItems.filter(
-        (i) =>
-          i.userId !== currentUser.uid &&
-          i.location &&
-          typeof i.location.lat === "number" &&
-          typeof i.location.lng === "number" &&
-          Math.abs(i.location.lat - location.lat) < 0.05 &&
-          Math.abs(i.location.lng - location.lng) < 0.05
-      );
-      setNearbyItems(nearby);
-
-      // Notify nearby users
-      await Promise.all(
-        nearby.map((i) =>
-          sendNotification(
-            i.userId!,
-            newItemId,
-            `Nearby ${status} item!`,
-            `A ${category} titled "${title}" is near your location.`
-          )
-        )
-      );
-
-      // Check for exact match
-      const match = findMatchingItem(itemData, allItems);
-      if (match?.id && match.userId) {
-        await updateItem(newItemId, { ...itemData, matchedItemId: match.id, id: undefined });
-        await updateItem(match.id, { ...match, matchedItemId: newItemId, id: undefined });
-
-        // Notify matched user
-        await addNotification({
-          toUserId: match.userId,
-          fromUserId: currentUser.uid,
-          title: "Match Found!",
-          message: `Your ${match.status} item "${match.title}" matches a ${status} item nearby.`,
-          type: "match",
-          itemId: match.id,
-          matchedItemId: newItemId,
-        });
-
-        // Notify current user
-        await addNotification({
-          toUserId: currentUser.uid,
-          fromUserId: match.userId,
-          title: "Match Found!",
-          message: `Your ${status} item "${title}" matches a ${match.status} item nearby.`,
-          type: "match",
-          itemId: newItemId,
-          matchedItemId: match.id,
-        });
-
-        Alert.alert("Match Found!", "This item matches with an existing item.");
-      }
-
-      router.replace("/(dashboard)/items");
-    } catch (err) {
+      // Reset form
+      setTitle("");
+      setDescription("");
+      setStatus("Lost");
+      setCategory("");
+      setContact("");
+      setImageUri(null);
+      setItemLocation({});
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to save item");
       console.error(err);
-      Alert.alert("Error", "Failed to save item");
-    } finally {
-      hideLoader();
     }
   };
 
+  const validLocation = getValidLocation(itemLocation);
+  const markers: MarkerType[] = validLocation ? [{ id: "selected", lat: validLocation.lat, lng: validLocation.lng }] : [];
+
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
-      <View className="flex-row justify-between items-center px-5 py-4 bg-white shadow">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={28} color="#3B82F6" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        
+        {/* Lost/Found toggle */}
+        <View style={{ flexDirection: "row", marginBottom: 16 }}>
+          {(["Lost", "Found"] as const).map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => setStatus(s)}
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                backgroundColor: status === s ? (s === "Lost" ? "#3B82F6" : "#10B981") : "#E5E7EB",
+                borderRadius: 12,
+                marginHorizontal: 4,
+              }}
+            >
+              <Text style={{
+                textAlign: "center",
+                color: status === s ? "#fff" : "#374151",
+                fontWeight: "600",
+              }}>{s}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Image */}
+        <TouchableOpacity
+          onPress={pickImage}
+          style={{
+            height: 180,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: "#D1D5DB",
+            marginBottom: 16,
+            overflow: "hidden",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} />
+          ) : (
+            <View style={{ justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ color: "#9CA3AF" }}>Tap to select image</Text>
+            </View>
+          )}
         </TouchableOpacity>
-        <Text className="text-2xl font-bold text-gray-900">{isNew ? "Add Item" : "Edit Item"}</Text>
-        <View className="w-8" />
-      </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-          {/* Lost / Found */}
-          <View className="flex-row mb-4 bg-gray-200 rounded-xl overflow-hidden">
-            {(["Lost", "Found"] as const).map((s) => (
-              <TouchableOpacity
-                key={s}
-                onPress={() => setStatus(s)}
-                className={`flex-1 py-3 rounded-xl ${status === s ? (s === "Lost" ? "bg-blue-500" : "bg-green-500") : ""}`}
-              >
-                <Text className={`text-center font-semibold ${status === s ? "text-white" : "text-gray-700"}`}>{s}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        {/* Title, Description, Contact */}
+        <TextInput
+          placeholder="Title"
+          value={title}
+          onChangeText={setTitle}
+          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
+        />
+        <TextInput
+          placeholder="Description"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={4}
+          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
+        />
+        <TextInput
+          placeholder="Contact Number"
+          value={contact}
+          onChangeText={setContact}
+          keyboardType="phone-pad"
+          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
+        />
 
-          {/* Image Picker */}
-          <Text className="text-gray-700 text-lg font-semibold mb-2">Photo</Text>
-          <TouchableOpacity onPress={pickImage} className="bg-white border border-gray-300 rounded-xl mb-4 items-center justify-center" style={{ height: 180 }}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%", borderRadius: 12 }} resizeMode="cover" />
-            ) : (
-              <View className="items-center justify-center flex-1">
-                <Ionicons name="image-outline" size={40} color="#9CA3AF" />
-                <Text className="text-gray-400 mt-2">Tap to select image</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {/* Title & Description */}
-          <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-4 shadow-sm" placeholder="Enter title" value={title} onChangeText={setTitle} />
-          <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-4 shadow-sm" placeholder="Enter description" value={description} onChangeText={setDescription} multiline numberOfLines={4} />
-
-          {/* Category */}
-          <View className="flex-row flex-wrap mb-4">
-            {categories.map((cat) => (
-              <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)} className={`px-4 py-2 mr-2 mb-2 rounded-2xl border border-gray-300 shadow ${category === cat.name ? "bg-blue-500" : "bg-white"}`}>
-                <Text className={`font-semibold ${category === cat.name ? "text-white" : "text-gray-700"}`}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Map Picker */}
-          <MapPicker
-            onLocationSelect={(lat, lng) => setLocation({ lat, lng })}
-            markers={nearbyItems
-              .filter(
-                (item): item is Item & { location: { lat: number; lng: number } } => !!item.location && !!item.id && typeof item.location.lat === "number" && typeof item.location.lng === "number"
-              )
-              .map((item) => ({
-                id: item.id,
-                lat: item.location.lat,
-                lng: item.location.lng,
-                title: item.title,
-                status: item.status,
-                photoURL: item.photoURL || null,
-              }))}
-            location={location || undefined}
-            zoom={10}
-          />
-          {location && <Text className="text-gray-500 mt-1">Selected: Lat {location.lat.toFixed(4)}, Lng {location.lng.toFixed(4)}</Text>}
-
-          {/* Contact Info */}
-          <TextInput className="bg-white border border-gray-300 p-3 rounded-xl mb-6 shadow-sm" placeholder="Enter contact info" value={contactInfo} onChangeText={setContactInfo} />
-
-          {/* Submit */}
-          <TouchableOpacity className="bg-blue-500 rounded-2xl py-4 items-center justify-center shadow-lg" onPress={handleSubmit}>
-            <Text className="text-white font-bold text-lg">{isNew ? "Add Item" : "Update Item"}</Text>
-          </TouchableOpacity>
+        {/* Category */}
+        <ScrollView horizontal style={{ marginBottom: 12 }}>
+          {categoriesList.map((cat) => (
+            <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
+              style={{ paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, borderRadius: 24, backgroundColor: category === cat.name ? "#3B82F6" : "#fff", borderWidth: 1, borderColor: "#D1D5DB" }}>
+              <Text style={{ color: category === cat.name ? "#fff" : "#374151", fontWeight: "600" }}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
-      </KeyboardAvoidingView>
+
+        {/* Map */}
+        <View style={{ height: 300, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+          <MapPicker
+            location={validLocation}
+            onLocationSelect={(lat, lng) => setItemLocation({ lat, lng })}
+            markers={markers}
+          />
+        </View>
+
+        {/* Selected coordinates */}
+        {validLocation && (
+          <Text style={{ color: "#6B7280", marginBottom: 12 }}>
+            Selected Location: Lat {itemLocation.lat?.toFixed(4)}, Lng {itemLocation.lng?.toFixed(4)}
+          </Text>
+        )}
+
+        {/* Submit */}
+        <TouchableOpacity onPress={handleSubmit} style={{ backgroundColor: "#3B82F6", paddingVertical: 16, borderRadius: 24, alignItems: "center" }}>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Submit</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
     </SafeAreaView>
   );
 };
