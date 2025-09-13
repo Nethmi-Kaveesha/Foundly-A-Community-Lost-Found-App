@@ -27,7 +27,7 @@ import Toast from "react-native-toast-message";
 const screenWidth = Dimensions.get("window").width;
 const categories = ["All", "Pets", "Electronics", "Bags", "Keys"];
 
-// Haversine formula to calculate distance in km
+// Distance calculation
 const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -35,13 +35,13 @@ const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) =
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
-// Image placeholder component
+// Image placeholder
 const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 8 }}>
     {photoURL ? (
@@ -86,7 +86,7 @@ const FoundlyItemsScreen = () => {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Get user location (Web & Mobile)
+  // Get user location
   useEffect(() => {
     const getLocation = async () => {
       try {
@@ -110,7 +110,7 @@ const FoundlyItemsScreen = () => {
     getLocation();
   }, []);
 
-  // Load all items from Firestore
+  // Load all items
   useEffect(() => {
     showLoader();
     const unsubscribe = onSnapshot(
@@ -128,7 +128,7 @@ const FoundlyItemsScreen = () => {
     return () => unsubscribe();
   }, []);
 
-  // Delete an item
+  // Delete item
   const handleDelete = (itemId?: string) => {
     if (!itemId) return;
     Alert.alert("Delete Item", "Are you sure you want to delete this item?", [
@@ -152,6 +152,22 @@ const FoundlyItemsScreen = () => {
     ]);
   };
 
+  // Apply filters
+  const applyFilters = (list: Item[]) =>
+    list
+      .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
+      .filter((i) => (categoryFilter === "All" ? true : i.category === categoryFilter))
+      .filter((i) =>
+        searchKeyword
+          ? i.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+            i.description.toLowerCase().includes(searchKeyword.toLowerCase())
+          : true
+      )
+      .filter((i) => {
+        if (!locationFilter || !i.location?.address) return true;
+        return i.location.address.toLowerCase().includes(locationFilter.toLowerCase());
+      });
+
   // Check Nearby / Matches
   const handleCheckNearby = () => {
     if (!userLocation) {
@@ -159,57 +175,43 @@ const FoundlyItemsScreen = () => {
       return;
     }
 
-    const nearby = items.filter(
+    const nearbyRaw = items.filter(
       (i) =>
         i.location?.lat != null &&
         i.location?.lng != null &&
         getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
     );
 
+    const nearby = applyFilters(nearbyRaw);
+
     const matched: Item[] = [];
     nearby.forEach((item) => {
       const match = findMatchingItem(item, items);
       if (match) matched.push(match);
     });
+    const matchedFiltered = applyFilters(matched);
 
     setNearbyItems(nearby);
-    setMatchedItems(matched);
+    setMatchedItems(matchedFiltered);
     setActiveTab("Nearby");
     setScrollIndex(0);
     setModalVisible(true);
 
     if (nearby.length > 0)
       Toast.show({ type: "info", text1: "Nearby Items Found", text2: `Found ${nearby.length} nearby items!` });
-
-    if (matched.length > 0)
-      Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matched.length} matches!` });
+    if (matchedFiltered.length > 0)
+      Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matchedFiltered.length} matches!` });
   };
 
-  // Filter items for grid
-  const filteredItems = items
-    .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
-    .filter((i) => (categoryFilter === "All" ? true : i.category === categoryFilter))
-    .filter((i) =>
-      searchKeyword
-        ? i.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-          i.description.toLowerCase().includes(searchKeyword.toLowerCase())
-        : true
-    )
-    .filter((i) => {
-      if (!locationFilter || !i.location?.address) return true;
-      return i.location.address.toLowerCase().includes(locationFilter.toLowerCase());
-    });
+  // Filter items for main grid
+  const filteredItems = applyFilters(items);
 
-  // Render item card
   const renderItemCard = (item: Item) => {
-    let isNearby = false;
-    let isMatched = false;
+    const isNearby = userLocation && item.location?.lat && item.location?.lng
+      ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
+      : false;
 
-    if (userLocation && item.location?.lat != null && item.location?.lng != null) {
-      isNearby = getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5;
-    }
-
-    isMatched = !!findMatchingItem(item, items);
+    const isMatched = !!findMatchingItem(item, items);
 
     return (
       <View
@@ -296,6 +298,8 @@ const FoundlyItemsScreen = () => {
         <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
       </View>
 
+      {/* Filters + Search UI can go here */}
+
       {/* Check Nearby / Match Button */}
       <View style={{ padding: 10 }}>
         <TouchableOpacity
@@ -312,7 +316,7 @@ const FoundlyItemsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Items Grid */}
+      {/* Main items grid */}
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 10,
@@ -356,15 +360,11 @@ const FoundlyItemsScreen = () => {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center" }}>
           <View style={{ backgroundColor: "white", margin: 20, borderRadius: 16, padding: 16 }}>
-            {/* Tabs */}
             <View style={{ flexDirection: "row", marginBottom: 12 }}>
               {["Nearby", "Match"].map((tab) => (
                 <TouchableOpacity
                   key={tab}
-                  onPress={() => {
-                    setActiveTab(tab as "Nearby" | "Match");
-                    setScrollIndex(0);
-                  }}
+                  onPress={() => setActiveTab(tab as "Nearby" | "Match")}
                   style={{
                     flex: 1,
                     padding: 8,
