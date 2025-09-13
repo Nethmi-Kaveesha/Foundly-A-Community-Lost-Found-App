@@ -5,7 +5,6 @@ import { deleteItem, itemColRef } from "@/services/itemService";
 import { findMatchingItem } from "@/services/matchService";
 import { Item } from "@/types/item";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
@@ -16,11 +15,11 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -28,22 +27,21 @@ import Toast from "react-native-toast-message";
 const screenWidth = Dimensions.get("window").width;
 const categories = ["All", "Pets", "Electronics", "Bags", "Keys"];
 
-// Distance calculator (Haversine formula)
+// Haversine formula to calculate distance in km
 const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371;
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 
-// Image placeholder
+// Image placeholder component
 const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 8 }}>
     {photoURL ? (
@@ -88,20 +86,31 @@ const FoundlyItemsScreen = () => {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Get user location
+  // Get user location (Web & Mobile)
   useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        console.warn("Location permission denied");
-        return;
+    const getLocation = async () => {
+      try {
+        if (Platform.OS === "web") {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            (err) => console.warn("Web location error:", err),
+            { enableHighAccuracy: true }
+          );
+        } else {
+          const Location = await import("expo-location");
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== "granted") return;
+          const loc = await Location.getCurrentPositionAsync({});
+          setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        }
+      } catch (err) {
+        console.error("Location error:", err);
       }
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-    })();
+    };
+    getLocation();
   }, []);
 
-  // Load items
+  // Load all items from Firestore
   useEffect(() => {
     showLoader();
     const unsubscribe = onSnapshot(
@@ -119,7 +128,7 @@ const FoundlyItemsScreen = () => {
     return () => unsubscribe();
   }, []);
 
-  // Delete item
+  // Delete an item
   const handleDelete = (itemId?: string) => {
     if (!itemId) return;
     Alert.alert("Delete Item", "Are you sure you want to delete this item?", [
@@ -176,6 +185,7 @@ const FoundlyItemsScreen = () => {
       Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matched.length} matches!` });
   };
 
+  // Filter items for grid
   const filteredItems = items
     .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
     .filter((i) => (categoryFilter === "All" ? true : i.category === categoryFilter))
@@ -190,6 +200,7 @@ const FoundlyItemsScreen = () => {
       return i.location.address.toLowerCase().includes(locationFilter.toLowerCase());
     });
 
+  // Render item card
   const renderItemCard = (item: Item) => {
     let isNearby = false;
     let isMatched = false;
@@ -289,79 +300,16 @@ const FoundlyItemsScreen = () => {
       <View style={{ padding: 10 }}>
         <TouchableOpacity
           onPress={handleCheckNearby}
-          style={{ backgroundColor: "#10B981", padding: 12, borderRadius: 12, alignItems: "center" }}
+          disabled={!userLocation || items.length === 0}
+          style={{
+            backgroundColor: !userLocation || items.length === 0 ? "#A7F3D0" : "#10B981",
+            padding: 12,
+            borderRadius: 12,
+            alignItems: "center",
+          }}
         >
           <Text style={{ color: "#fff", fontWeight: "bold" }}>Check Nearby / Match</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Lost/Found Toggle */}
-      <View className="flex-row mx-5 my-3 bg-gray-200 rounded-xl overflow-hidden">
-        {(["Lost", "Found"] as const).map((s) => (
-          <TouchableOpacity
-            key={s}
-            onPress={() => setStatusFilter(s)}
-            className={`flex-1 py-3 rounded-xl ${statusFilter === s ? (s === "Lost" ? "bg-blue-500" : "bg-green-500") : ""}`}
-          >
-            <Text className={`text-center font-semibold ${statusFilter === s ? "text-white" : "text-gray-700"}`}>{s}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Search + Location */}
-      <View style={{ paddingHorizontal: 10, marginBottom: 10, flexDirection: "row" }}>
-        <TextInput
-          placeholder="Search items..."
-          value={searchKeyword}
-          onChangeText={setSearchKeyword}
-          style={{
-            flex: 1,
-            backgroundColor: "white",
-            borderWidth: 1,
-            borderColor: "#D1D5DB",
-            padding: 10,
-            borderTopLeftRadius: 12,
-            borderBottomLeftRadius: 12,
-            marginRight: 5,
-          }}
-        />
-        <TextInput
-          placeholder="Location..."
-          value={locationFilter}
-          onChangeText={setLocationFilter}
-          style={{
-            flex: 1,
-            backgroundColor: "white",
-            borderWidth: 1,
-            borderColor: "#D1D5DB",
-            padding: 10,
-            borderTopRightRadius: 12,
-            borderBottomRightRadius: 12,
-            marginLeft: 5,
-          }}
-        />
-      </View>
-
-      {/* Categories */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 10, marginBottom: 10 }}>
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            onPress={() => setCategoryFilter(cat)}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              marginRight: 8,
-              marginBottom: 8,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: "#D1D5DB",
-              backgroundColor: categoryFilter === cat ? "#3B82F6" : "white",
-            }}
-          >
-            <Text style={{ fontWeight: "600", color: categoryFilter === cat ? "white" : "#374151" }}>{cat}</Text>
-          </TouchableOpacity>
-        ))}
       </View>
 
       {/* Items Grid */}
@@ -385,7 +333,7 @@ const FoundlyItemsScreen = () => {
         )}
       </ScrollView>
 
-      {/* Floating Action Button */}
+      {/* Floating Add Button */}
       <TouchableOpacity
         style={{
           position: "absolute",
@@ -404,7 +352,7 @@ const FoundlyItemsScreen = () => {
         <MaterialIcons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Nearby / Match Modal */}
+      {/* Nearby/Match Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center" }}>
           <View style={{ backgroundColor: "white", margin: 20, borderRadius: 16, padding: 16 }}>
@@ -429,7 +377,6 @@ const FoundlyItemsScreen = () => {
               ))}
             </View>
 
-            {/* Horizontal FlatList with snap */}
             <FlatList
               data={activeTab === "Nearby" ? nearbyItems : matchedItems}
               horizontal
@@ -446,23 +393,6 @@ const FoundlyItemsScreen = () => {
               contentContainerStyle={{ paddingHorizontal: 10 }}
             />
 
-            {/* Scroll Dots */}
-            <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 8 }}>
-              {(activeTab === "Nearby" ? nearbyItems : matchedItems).map((_, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: scrollIndex === i ? 12 : 8,
-                    height: scrollIndex === i ? 12 : 8,
-                    borderRadius: 6,
-                    backgroundColor: scrollIndex === i ? "#3B82F6" : "#D1D5DB",
-                    marginHorizontal: 4,
-                  }}
-                />
-              ))}
-            </View>
-
-            {/* Close button */}
             <TouchableOpacity
               onPress={() => setModalVisible(false)}
               style={{ marginTop: 16, alignSelf: "center", padding: 8 }}
