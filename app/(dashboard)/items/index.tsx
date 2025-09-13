@@ -1,4 +1,5 @@
 "use client";
+
 import { useLoader } from "@/context/LoaderContext";
 import { deleteItem, itemColRef } from "@/services/itemService";
 import { findMatchingItem } from "@/services/matchService";
@@ -151,8 +152,8 @@ const FoundlyItemsScreen = () => {
 
     const nearby = items.filter(
       (i) =>
-        i.location?.lat &&
-        i.location?.lng &&
+        i.location?.lat != null &&
+        i.location?.lng != null &&
         getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
     );
 
@@ -189,53 +190,92 @@ const FoundlyItemsScreen = () => {
       return i.location.address.toLowerCase().includes(locationFilter.toLowerCase());
     });
 
-  // Render card inside modal
   const renderItemCard = (item: Item) => {
-    const isNearby =
-      userLocation &&
-      item.location?.lat &&
-      item.location?.lng &&
-      getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5;
+    let isNearby = false;
+    let isMatched = false;
+
+    if (userLocation && item.location?.lat != null && item.location?.lng != null) {
+      isNearby = getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5;
+    }
+
+    isMatched = !!findMatchingItem(item, items);
 
     return (
       <View
+        key={item.id}
         style={{
-          width: screenWidth * 0.7,
-          marginHorizontal: 8,
+          width: screenWidth / 2 - 20,
           backgroundColor: "#fff",
           borderRadius: 16,
+          marginBottom: 12,
           overflow: "hidden",
           elevation: 3,
-          borderWidth: item.matchedItemId ? 2 : 0,
-          borderColor: item.matchedItemId ? "#FBBF24" : "transparent",
+          borderWidth: isMatched ? 2 : 0,
+          borderColor: isMatched ? "#FBBF24" : "transparent",
         }}
       >
         <ImagePlaceholder photoURL={item.photoURL} />
         <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
-          <Text
-            style={{ fontWeight: "bold", fontSize: 16, color: "#111827", textAlign: "center" }}
-            numberOfLines={1}
-          >
+          <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
             {item.title}
           </Text>
           <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
             {item.description}
           </Text>
-          <Text
-            style={{
-              textAlign: "center",
-              marginTop: 4,
-              fontSize: 12,
-              fontWeight: "600",
-              color: item.matchedItemId ? "#F59E0B" : isNearby ? "#10B981" : "#6B7280",
-            }}
-          >
-            {item.matchedItemId ? "⚡ Matched!" : isNearby ? "📍 Nearby" : item.status}
-          </Text>
+
+          {(isNearby || isMatched) && (
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 4,
+                fontSize: 12,
+                fontWeight: "600",
+                color: isMatched ? "#F59E0B" : "#10B981",
+              }}
+            >
+              {isMatched ? "⚡ Matched!" : "📍 Nearby"}
+            </Text>
+          )}
+
+          {item.userId === currentUser?.uid && (
+            <View style={{ flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  marginRight: 4,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: "#FCD34D",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => item.id && router.push(`/items/${item.id}`)}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  marginLeft: 4,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: "#EF4444",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => handleDelete(item.id)}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     );
   };
+
+  if (!userLocation) return <Text style={{ padding: 20 }}>Loading location...</Text>;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
@@ -341,88 +381,7 @@ const FoundlyItemsScreen = () => {
             <Text className="mt-4 text-gray-500 text-lg">No items found!</Text>
           </View>
         ) : (
-          filteredItems.map((item) => {
-            const isNearby =
-              userLocation &&
-              item.location?.lat &&
-              item.location?.lng &&
-              getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5;
-
-            return (
-              <View
-                key={item.id}
-                style={{
-                  width: screenWidth / 2 - 20,
-                  backgroundColor: "#fff",
-                  borderRadius: 16,
-                  marginBottom: 12,
-                  overflow: "hidden",
-                  elevation: 3,
-                  borderWidth: item.matchedItemId ? 2 : 0,
-                  borderColor: item.matchedItemId ? "#FBBF24" : "transparent",
-                }}
-              >
-                <ImagePlaceholder photoURL={item.photoURL} />
-                <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
-                  <Text
-                    style={{ fontWeight: "bold", fontSize: 16, color: "#111827", textAlign: "center" }}
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                  <Text
-                    style={{
-                      textAlign: "center",
-                      marginTop: 4,
-                      fontSize: 12,
-                      fontWeight: "600",
-                      color: item.matchedItemId ? "#F59E0B" : isNearby ? "#10B981" : "#6B7280",
-                    }}
-                  >
-                    {item.matchedItemId ? "⚡ Matched!" : isNearby ? "📍 Nearby" : item.status}
-                  </Text>
-
-                  {/* Actions */}
-                  {item.userId === currentUser?.uid && (
-                    <View style={{ flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
-                      <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          marginRight: 4,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: "#FCD34D",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onPress={() => item.id && router.push(`/items/${item.id}`)}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          marginLeft: 4,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: "#EF4444",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                        onPress={() => handleDelete(item.id)}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })
+          filteredItems.map(renderItemCard)
         )}
       </ScrollView>
 
