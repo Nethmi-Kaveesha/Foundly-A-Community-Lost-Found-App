@@ -5,12 +5,14 @@ import { deleteItem, itemColRef } from "@/services/itemService";
 import { findMatchingItem } from "@/services/matchService";
 import { Item } from "@/types/item";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   FlatList,
   Image,
@@ -18,14 +20,14 @@ import {
   Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
 
 const screenWidth = Dimensions.get("window").width;
-const categories = ["All", "Pets", "Electronics", "Bags", "Keys"];
 
 // Distance calculation
 const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -35,8 +37,8 @@ const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) =
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) ** 2;
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -67,19 +69,124 @@ const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   </View>
 );
 
+// --------------------- Dropdown Component ---------------------
+const DropdownFilter = ({
+  label,
+  selected,
+  options,
+  onSelect,
+  openDropdown,
+  setOpenDropdown,
+}: {
+  label: string;
+  selected: string;
+  options: string[];
+  onSelect: (val: string) => void;
+  openDropdown: string | null;
+  setOpenDropdown: (val: string | null) => void;
+}) => {
+  const isOpen = openDropdown === label;
+
+  const opacity = useState(new Animated.Value(0))[0];
+  const translateY = useState(new Animated.Value(-20))[0];
+  const rotate = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    if (isOpen) {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(rotate, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: -20, duration: 150, useNativeDriver: true }),
+        Animated.timing(rotate, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [isOpen]);
+
+  const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
+
+  return (
+    <View style={{ marginRight: 8 }}>
+      <TouchableOpacity
+        onPress={() => setOpenDropdown(isOpen ? null : label)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: selected !== "All" ? "#3B82F6" : "#E5E7EB",
+          paddingHorizontal: 14,
+          paddingVertical: 6,
+          borderRadius: 20,
+        }}
+      >
+        <Text style={{ color: selected !== "All" ? "#fff" : "#374151", fontWeight: "500" }}>
+          {label}: {selected}
+        </Text>
+        <Animated.View style={{ marginLeft: 6, transform: [{ rotate: rotation }] }}>
+          <Ionicons name="chevron-down" size={16} color={selected !== "All" ? "#fff" : "#374151"} />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {isOpen && (
+        <Modal transparent visible={isOpen} animationType="none">
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpenDropdown(null)}>
+            <Animated.View
+              style={{
+                position: "absolute",
+                top: 50,
+                left: 10,
+                backgroundColor: "#fff",
+                borderRadius: 12,
+                paddingVertical: 4,
+                minWidth: 120,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 5,
+                opacity: opacity,
+                transform: [{ translateY: translateY }],
+              }}
+            >
+              {options.map((opt) => (
+                <TouchableOpacity
+                  key={opt}
+                  onPress={() => {
+                    onSelect(opt);
+                    setOpenDropdown(null);
+                  }}
+                  style={{ padding: 10 }}
+                >
+                  <Text style={{ color: opt === selected ? "#3B82F6" : "#374151", fontWeight: "500" }}>
+                    {opt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+    </View>
+  );
+};
+
+// --------------------- Main Screen ---------------------
 const FoundlyItemsScreen = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [statusFilter, setStatusFilter] = useState<"All" | "Lost" | "Found">("All");
-  const [searchKeyword, setSearchKeyword] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [locationFilter, setLocationFilter] = useState("");
+  const [sortOption, setSortOption] = useState("Newest");
+  const [searchKeyword, setSearchKeyword] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"Nearby" | "Match">("Nearby");
   const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
   const [matchedItems, setMatchedItems] = useState<Item[]>([]);
-  const [scrollIndex, setScrollIndex] = useState(0);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
   const router = useRouter();
   const { showLoader, hideLoader } = useLoader();
@@ -152,9 +259,9 @@ const FoundlyItemsScreen = () => {
     ]);
   };
 
-  // Apply filters
-  const applyFilters = (list: Item[]) =>
-    list
+  // Filters
+  const applyFilters = (list: Item[]) => {
+    let filtered = list
       .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
       .filter((i) => (categoryFilter === "All" ? true : i.category === categoryFilter))
       .filter((i) =>
@@ -162,55 +269,32 @@ const FoundlyItemsScreen = () => {
           ? i.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
             i.description.toLowerCase().includes(searchKeyword.toLowerCase())
           : true
-      )
-      .filter((i) => {
-        if (!locationFilter || !i.location?.address) return true;
-        return i.location.address.toLowerCase().includes(locationFilter.toLowerCase());
-      });
+      );
 
-  // Check Nearby / Matches
-  const handleCheckNearby = () => {
-    if (!userLocation) {
-      Alert.alert("Location Error", "User location not available");
-      return;
+    if (sortOption === "Nearest" && userLocation) {
+      filtered = filtered.sort((a, b) => {
+        const distA =
+          a.location?.lat && a.location?.lng
+            ? getDistanceKm(userLocation.lat, userLocation.lng, a.location.lat, a.location.lng)
+            : Infinity;
+        const distB =
+          b.location?.lat && b.location?.lng
+            ? getDistanceKm(userLocation.lat, userLocation.lng, b.location.lat, b.location.lng)
+            : Infinity;
+        return distA - distB;
+      });
     }
 
-    const nearbyRaw = items.filter(
-      (i) =>
-        i.location?.lat != null &&
-        i.location?.lng != null &&
-        getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
-    );
-
-    const nearby = applyFilters(nearbyRaw);
-
-    const matched: Item[] = [];
-    nearby.forEach((item) => {
-      const match = findMatchingItem(item, items);
-      if (match) matched.push(match);
-    });
-    const matchedFiltered = applyFilters(matched);
-
-    setNearbyItems(nearby);
-    setMatchedItems(matchedFiltered);
-    setActiveTab("Nearby");
-    setScrollIndex(0);
-    setModalVisible(true);
-
-    if (nearby.length > 0)
-      Toast.show({ type: "info", text1: "Nearby Items Found", text2: `Found ${nearby.length} nearby items!` });
-    if (matchedFiltered.length > 0)
-      Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matchedFiltered.length} matches!` });
+    return filtered;
   };
 
-  // Filter items for main grid
   const filteredItems = applyFilters(items);
 
   const renderItemCard = (item: Item) => {
-    const isNearby = userLocation && item.location?.lat && item.location?.lng
-      ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
-      : false;
-
+    const isNearby =
+      userLocation && item.location?.lat && item.location?.lng
+        ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
+        : false;
     const isMatched = !!findMatchingItem(item, items);
 
     return (
@@ -235,7 +319,6 @@ const FoundlyItemsScreen = () => {
           <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
             {item.description}
           </Text>
-
           {(isNearby || isMatched) && (
             <Text
               style={{
@@ -249,7 +332,6 @@ const FoundlyItemsScreen = () => {
               {isMatched ? "⚡ Matched!" : "📍 Nearby"}
             </Text>
           )}
-
           {item.userId === currentUser?.uid && (
             <View style={{ flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
               <TouchableOpacity
@@ -288,7 +370,35 @@ const FoundlyItemsScreen = () => {
     );
   };
 
-  if (!userLocation) return <Text style={{ padding: 20 }}>Loading location...</Text>;
+  // ------------------- Check Nearby / Match -------------------
+  const handleCheckNearby = () => {
+    if (!userLocation) return Alert.alert("Location Error", "User location not available");
+
+    const nearbyRaw = items.filter(
+      (i) =>
+        i.location?.lat != null &&
+        i.location?.lng != null &&
+        getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
+    );
+
+    const nearby = applyFilters(nearbyRaw);
+    const matched: Item[] = [];
+    nearby.forEach((item) => {
+      const match = findMatchingItem(item, items);
+      if (match) matched.push(match);
+    });
+    const matchedFiltered = applyFilters(matched);
+
+    setNearbyItems(nearby);
+    setMatchedItems(matchedFiltered);
+    setActiveTab("Nearby");
+    setModalVisible(true);
+
+    if (nearby.length)
+      Toast.show({ type: "info", text1: "Nearby Items Found", text2: `Found ${nearby.length} nearby items!` });
+    if (matchedFiltered.length)
+      Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matchedFiltered.length} matches!` });
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-gray-100">
@@ -298,25 +408,57 @@ const FoundlyItemsScreen = () => {
         <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
       </View>
 
-      {/* Filters + Search UI can go here */}
+      {/* Search and Filters */}
+      <View style={{ padding: 10 }}>
+        <TextInput
+          placeholder="Search items..."
+          value={searchKeyword}
+          onChangeText={setSearchKeyword}
+          style={{ backgroundColor: "#fff", padding: 10, borderRadius: 12, marginBottom: 6 }}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: "row" }}>
+          <DropdownFilter
+            label="Status"
+            selected={statusFilter}
+            options={["All", "Lost", "Found"]}
+            onSelect={(val) => setStatusFilter(val as any)}
+            openDropdown={openDropdown}
+            setOpenDropdown={setOpenDropdown}
+          />
+          <DropdownFilter
+            label="Category"
+            selected={categoryFilter}
+            options={["All", "Pets", "Electronics", "Bags", "Keys"]}
+            onSelect={setCategoryFilter}
+            openDropdown={openDropdown}
+            setOpenDropdown={setOpenDropdown}
+          />
+          <DropdownFilter
+            label="Sort"
+            selected={sortOption}
+            options={["Newest", "Nearest"]}
+            onSelect={setSortOption}
+            openDropdown={openDropdown}
+            setOpenDropdown={setOpenDropdown}
+          />
+        </ScrollView>
+      </View>
 
       {/* Check Nearby / Match Button */}
       <View style={{ padding: 10 }}>
-        <TouchableOpacity
-          onPress={handleCheckNearby}
-          disabled={!userLocation || items.length === 0}
-          style={{
-            backgroundColor: !userLocation || items.length === 0 ? "#A7F3D0" : "#10B981",
-            padding: 12,
-            borderRadius: 12,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "#fff", fontWeight: "bold" }}>Check Nearby / Match</Text>
+        <TouchableOpacity onPress={handleCheckNearby} disabled={!userLocation || items.length === 0} activeOpacity={0.8}>
+          <LinearGradient
+            colors={["#34D399", "#10B981"]}
+            start={[0, 0]}
+            end={[1, 0]}
+            style={{ padding: 14, borderRadius: 12, alignItems: "center" }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Check Nearby / Match</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      {/* Main items grid */}
+      {/* Items Grid */}
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 10,
@@ -328,9 +470,9 @@ const FoundlyItemsScreen = () => {
         keyboardShouldPersistTaps="handled"
       >
         {filteredItems.length === 0 ? (
-          <View className="w-full items-center justify-center mt-20">
+          <View style={{ width: "100%", alignItems: "center", marginTop: 50 }}>
             <Ionicons name="happy-outline" size={64} color="#9CA3AF" />
-            <Text className="mt-4 text-gray-500 text-lg">No items found!</Text>
+            <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 16 }}>No items found!</Text>
           </View>
         ) : (
           filteredItems.map(renderItemCard)
@@ -356,10 +498,11 @@ const FoundlyItemsScreen = () => {
         <MaterialIcons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Nearby/Match Modal */}
+      {/* Nearby / Match Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center" }}>
           <View style={{ backgroundColor: "white", margin: 20, borderRadius: 16, padding: 16 }}>
+            {/* Tabs */}
             <View style={{ flexDirection: "row", marginBottom: 12 }}>
               {["Nearby", "Match"].map((tab) => (
                 <TouchableOpacity
@@ -383,20 +526,12 @@ const FoundlyItemsScreen = () => {
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.id || Math.random().toString()}
               renderItem={({ item }) => renderItemCard(item)}
-              onScroll={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.x / (screenWidth * 0.7 + 16));
-                setScrollIndex(index);
-              }}
-              scrollEventThrottle={16}
               snapToInterval={screenWidth * 0.7 + 16}
               decelerationRate="fast"
               contentContainerStyle={{ paddingHorizontal: 10 }}
             />
 
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={{ marginTop: 16, alignSelf: "center", padding: 8 }}
-            >
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 16, alignSelf: "center", padding: 8 }}>
               <Text style={{ color: "#EF4444", fontWeight: "600" }}>Close</Text>
             </TouchableOpacity>
           </View>
