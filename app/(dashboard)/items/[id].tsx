@@ -1,17 +1,17 @@
 "use client";
 
 import type { MarkerType } from "@/components/MapPicker.types";
-import { createItem, itemColRef } from "@/services/itemService";
+import { createItem } from "@/services/itemService";
 import type { Item, ItemLocation } from "@/types/item";
 import * as ImagePicker from "expo-image-picker";
 import { getAuth } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
 import dynamic from "next/dynamic";
 import React, { useState } from "react";
-import { Alert, Image, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
-// Dynamically import map picker
+// Map picker
 const MapPicker = dynamic(
   () =>
     Platform.OS === "web"
@@ -20,7 +20,6 @@ const MapPicker = dynamic(
   { ssr: false }
 );
 
-// Categories list
 const categoriesList = [
   { id: "1", name: "Pets" },
   { id: "2", name: "Electronics" },
@@ -28,25 +27,18 @@ const categoriesList = [
   { id: "4", name: "Keys" },
 ];
 
-// Validate location
 const getValidLocation = (loc?: ItemLocation) =>
-  loc?.lat !== undefined && loc?.lng !== undefined
-    ? { lat: loc.lat, lng: loc.lng }
-    : undefined;
+  loc?.lat !== undefined && loc?.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined;
 
-interface FoundlyItemFormScreenProps {
-  item?: Item; // Optional for edit
-  onSave?: () => void; // Callback after save
-}
-
-const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onSave }) => {
-  const [title, setTitle] = useState(item?.title || "");
-  const [description, setDescription] = useState(item?.description || "");
-  const [status, setStatus] = useState<"Lost" | "Found">(item?.status || "Lost");
-  const [category, setCategory] = useState(item?.category || "");
-  const [contact, setContact] = useState(item?.contactInfo || "");
-  const [imageUri, setImageUri] = useState<string | null>(item?.photoURL || null);
-  const [itemLocation, setItemLocation] = useState<ItemLocation>(item?.location || {});
+const FoundlyItemFormScreen: React.FC = () => {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<"Lost" | "Found">("Lost");
+  const [category, setCategory] = useState("");
+  const [contact, setContact] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [itemLocation, setItemLocation] = useState<ItemLocation>({});
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
   const auth = getAuth();
   const currentUser = auth.currentUser;
@@ -64,13 +56,13 @@ const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onS
     }
   };
 
-  // Submit form
+  // Save item
   const handleSubmit = async () => {
-    if (!title.trim()) return Alert.alert("Validation", "Title is required");
-    if (!category) return Alert.alert("Validation", "Select a category");
-    if (!contact.trim()) return Alert.alert("Validation", "Enter contact number");
-    if (!getValidLocation(itemLocation)) return Alert.alert("Validation", "Select a location on the map");
-    if (!currentUser) return Alert.alert("Error", "You must be logged in");
+    if (!title.trim()) return Toast.show({ type: "error", text1: "Title is required" });
+    if (!category) return Toast.show({ type: "error", text1: "Select a category" });
+    if (!contact.trim()) return Toast.show({ type: "error", text1: "Enter contact number" });
+    if (!getValidLocation(itemLocation)) return Toast.show({ type: "error", text1: "Select a location on the map" });
+    if (!currentUser) return Toast.show({ type: "error", text1: "You must be logged in" });
 
     try {
       const newItem: Item = {
@@ -82,36 +74,39 @@ const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onS
         photoURL: imageUri || undefined,
         location: itemLocation,
         userId: currentUser.uid,
-        id: item?.id,
       };
 
-      if (item) {
-        // Update existing item
-        await updateDoc(doc(itemColRef, item.id!), {
-          title: newItem.title,
-          description: newItem.description,
-          status: newItem.status,
-          category: newItem.category,
-          contactInfo: newItem.contactInfo,
-          photoURL: newItem.photoURL,
-          location: newItem.location,
-        });
-        Alert.alert("Success", "Item updated!");
-      } else {
-        // Create new item
-        await createItem(newItem);
-        Alert.alert("Success", "Item posted successfully!");
-      }
+      // Save to Firestore
+      await createItem(newItem);
 
-      // Reset form if creating new
-      if (!item) {
-        setTitle(""); setDescription(""); setStatus("Lost"); setCategory(""); setContact(""); setImageUri(null); setItemLocation({});
-      }
+      // Show toast
+      Toast.show({
+        type: "success",
+        text1: "Item saved successfully!",
+        position: "top",
+        visibilityTime: 2000,
+      });
 
-      onSave?.();
+      // Show custom success modal
+      setSuccessModalVisible(true);
+
+      // Clear form
+      setTitle("");
+      setDescription("");
+      setStatus("Lost");
+      setCategory("");
+      setContact("");
+      setImageUri(null);
+      setItemLocation({});
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to save item");
       console.error(err);
+      Toast.show({
+        type: "error",
+        text1: "Failed to save item",
+        text2: err.message || "Something went wrong",
+        position: "top",
+        visibilityTime: 2000,
+      });
     }
   };
 
@@ -121,8 +116,6 @@ const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onS
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        
-        {/* Lost/Found toggle */}
         <View style={{ flexDirection: "row", marginBottom: 16 }}>
           {(["Lost", "Found"] as const).map((s) => (
             <TouchableOpacity
@@ -141,19 +134,9 @@ const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onS
           ))}
         </View>
 
-        {/* Image picker */}
         <TouchableOpacity
           onPress={pickImage}
-          style={{
-            height: 180,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: "#D1D5DB",
-            marginBottom: 16,
-            overflow: "hidden",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+          style={{ height: 180, borderRadius: 12, borderWidth: 1, borderColor: "#D1D5DB", marginBottom: 16, overflow: "hidden", justifyContent: "center", alignItems: "center" }}
         >
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} />
@@ -164,59 +147,48 @@ const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onS
           )}
         </TouchableOpacity>
 
-        {/* Title, Description, Contact */}
-        <TextInput
-          placeholder="Title"
-          value={title}
-          onChangeText={setTitle}
-          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
-        />
-        <TextInput
-          placeholder="Description"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
-        />
-        <TextInput
-          placeholder="Contact Number"
-          value={contact}
-          onChangeText={setContact}
-          keyboardType="phone-pad"
-          style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
-        />
+        <TextInput placeholder="Title" value={title} onChangeText={setTitle} style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }} />
+        <TextInput placeholder="Description" value={description} onChangeText={setDescription} multiline numberOfLines={4} style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }} />
+        <TextInput placeholder="Contact Number" value={contact} onChangeText={setContact} keyboardType="phone-pad" style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }} />
 
-        {/* Categories */}
         <ScrollView horizontal style={{ marginBottom: 12 }}>
           {categoriesList.map((cat) => (
-            <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
-              style={{ paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, borderRadius: 24, backgroundColor: category === cat.name ? "#3B82F6" : "#fff", borderWidth: 1, borderColor: "#D1D5DB" }}>
+            <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)} style={{ paddingHorizontal: 16, paddingVertical: 8, marginRight: 8, borderRadius: 24, backgroundColor: category === cat.name ? "#3B82F6" : "#fff", borderWidth: 1, borderColor: "#D1D5DB" }}>
               <Text style={{ color: category === cat.name ? "#fff" : "#374151", fontWeight: "600" }}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Map */}
         <View style={{ height: 300, borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
-          <MapPicker
-            location={validLocation}
-            onLocationSelect={(lat, lng) => setItemLocation({ lat, lng })}
-            markers={markers}
-          />
+          <MapPicker location={validLocation} onLocationSelect={(lat, lng) => setItemLocation({ lat, lng })} markers={markers} />
         </View>
 
-        {/* Selected coordinates */}
-        {validLocation && (
-          <Text style={{ color: "#6B7280", marginBottom: 12 }}>
-            Selected Location: Lat {itemLocation.lat?.toFixed(4)}, Lng {itemLocation.lng?.toFixed(4)}
-          </Text>
-        )}
+        {validLocation && <Text style={{ color: "#6B7280", marginBottom: 12 }}>Selected Location: Lat {itemLocation.lat?.toFixed(4)}, Lng {itemLocation.lng?.toFixed(4)}</Text>}
 
-        {/* Submit */}
         <TouchableOpacity onPress={handleSubmit} style={{ backgroundColor: "#3B82F6", paddingVertical: 16, borderRadius: 24, alignItems: "center" }}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{item ? "Update Item" : "Submit"}</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Submit</Text>
         </TouchableOpacity>
+
+        <Toast />
+
+        {/* Success Modal */}
+        <Modal
+          visible={successModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSuccessModalVisible(false)}
+        >
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <View style={{ width: 300, backgroundColor: "#fff", padding: 20, borderRadius: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 12 }}>Success!</Text>
+              <Text style={{ marginBottom: 20 }}>Your item has been saved successfully.</Text>
+              <TouchableOpacity onPress={() => setSuccessModalVisible(false)} style={{ backgroundColor: "#3B82F6", padding: 12, borderRadius: 8 }}>
+                <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>OK</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
     </SafeAreaView>
   );
