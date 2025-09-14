@@ -1,10 +1,11 @@
 "use client";
 
 import type { MarkerType } from "@/components/MapPicker.types";
-import { createItem } from "@/services/itemService";
+import { createItem, itemColRef } from "@/services/itemService";
 import type { Item, ItemLocation } from "@/types/item";
 import * as ImagePicker from "expo-image-picker";
 import { getAuth } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
 import dynamic from "next/dynamic";
 import React, { useState } from "react";
 import { Alert, Image, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
@@ -19,7 +20,7 @@ const MapPicker = dynamic(
   { ssr: false }
 );
 
-// Categories
+// Categories list
 const categoriesList = [
   { id: "1", name: "Pets" },
   { id: "2", name: "Electronics" },
@@ -33,14 +34,19 @@ const getValidLocation = (loc?: ItemLocation) =>
     ? { lat: loc.lat, lng: loc.lng }
     : undefined;
 
-const FoundlyItemFormScreen: React.FC = () => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"Lost" | "Found">("Lost");
-  const [category, setCategory] = useState("");
-  const [contact, setContact] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [itemLocation, setItemLocation] = useState<ItemLocation>({});
+interface FoundlyItemFormScreenProps {
+  item?: Item; // Optional for edit
+  onSave?: () => void; // Callback after save
+}
+
+const FoundlyItemFormScreen: React.FC<FoundlyItemFormScreenProps> = ({ item, onSave }) => {
+  const [title, setTitle] = useState(item?.title || "");
+  const [description, setDescription] = useState(item?.description || "");
+  const [status, setStatus] = useState<"Lost" | "Found">(item?.status || "Lost");
+  const [category, setCategory] = useState(item?.category || "");
+  const [contact, setContact] = useState(item?.contactInfo || "");
+  const [imageUri, setImageUri] = useState<string | null>(item?.photoURL || null);
+  const [itemLocation, setItemLocation] = useState<ItemLocation>(item?.location || {});
 
   const auth = getAuth();
   const currentUser = auth.currentUser;
@@ -76,19 +82,33 @@ const FoundlyItemFormScreen: React.FC = () => {
         photoURL: imageUri || undefined,
         location: itemLocation,
         userId: currentUser.uid,
+        id: item?.id,
       };
 
-      const id = await createItem(newItem);
-      Alert.alert("Success", "Item posted successfully!");
+      if (item) {
+        // Update existing item
+        await updateDoc(doc(itemColRef, item.id!), {
+          title: newItem.title,
+          description: newItem.description,
+          status: newItem.status,
+          category: newItem.category,
+          contactInfo: newItem.contactInfo,
+          photoURL: newItem.photoURL,
+          location: newItem.location,
+        });
+        Alert.alert("Success", "Item updated!");
+      } else {
+        // Create new item
+        await createItem(newItem);
+        Alert.alert("Success", "Item posted successfully!");
+      }
 
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setStatus("Lost");
-      setCategory("");
-      setContact("");
-      setImageUri(null);
-      setItemLocation({});
+      // Reset form if creating new
+      if (!item) {
+        setTitle(""); setDescription(""); setStatus("Lost"); setCategory(""); setContact(""); setImageUri(null); setItemLocation({});
+      }
+
+      onSave?.();
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to save item");
       console.error(err);
@@ -116,16 +136,12 @@ const FoundlyItemFormScreen: React.FC = () => {
                 marginHorizontal: 4,
               }}
             >
-              <Text style={{
-                textAlign: "center",
-                color: status === s ? "#fff" : "#374151",
-                fontWeight: "600",
-              }}>{s}</Text>
+              <Text style={{ textAlign: "center", color: status === s ? "#fff" : "#374151", fontWeight: "600" }}>{s}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Image */}
+        {/* Image picker */}
         <TouchableOpacity
           onPress={pickImage}
           style={{
@@ -171,7 +187,7 @@ const FoundlyItemFormScreen: React.FC = () => {
           style={{ backgroundColor: "#fff", padding: 12, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: "#D1D5DB" }}
         />
 
-        {/* Category */}
+        {/* Categories */}
         <ScrollView horizontal style={{ marginBottom: 12 }}>
           {categoriesList.map((cat) => (
             <TouchableOpacity key={cat.id} onPress={() => setCategory(cat.name)}
@@ -199,9 +215,8 @@ const FoundlyItemFormScreen: React.FC = () => {
 
         {/* Submit */}
         <TouchableOpacity onPress={handleSubmit} style={{ backgroundColor: "#3B82F6", paddingVertical: 16, borderRadius: 24, alignItems: "center" }}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Submit</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{item ? "Update Item" : "Submit"}</Text>
         </TouchableOpacity>
-
       </ScrollView>
     </SafeAreaView>
   );
