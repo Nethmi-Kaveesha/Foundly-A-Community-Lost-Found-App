@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -38,6 +39,9 @@ const ProfileScreen = () => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState(true);
@@ -95,6 +99,7 @@ const ProfileScreen = () => {
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
+
     try {
       let uploadedPhotoURL = photoURL;
 
@@ -135,7 +140,9 @@ const ProfileScreen = () => {
       Alert.alert("Success", "Profile updated successfully!");
     } catch (err: any) {
       console.error(err);
-      if (err.code === "auth/requires-recent-login") {
+      if (err.code === "auth/wrong-password") {
+        Alert.alert("Error", "Current password is incorrect");
+      } else if (err.code === "auth/requires-recent-login") {
         Alert.alert(
           "Error",
           "Please log out and log in again before changing sensitive info like password."
@@ -187,30 +194,60 @@ const ProfileScreen = () => {
         />
 
         <Text style={[styles.sectionTitle, darkMode && { color: "#F9FAFB" }]}>Change Password</Text>
-        <TextInput
-          style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
-          value={currentPassword}
-          onChangeText={setCurrentPassword}
-          placeholder="Current Password"
-          secureTextEntry
-          placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
-        />
-        <TextInput
-          style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
-          value={newPassword}
-          onChangeText={setNewPassword}
-          placeholder="New Password"
-          secureTextEntry
-          placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
-        />
-        <TextInput
-          style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          placeholder="Confirm New Password"
-          secureTextEntry
-          placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
-        />
+
+        {/* Current Password */}
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+            placeholder="Current Password"
+            secureTextEntry={!showCurrent}
+            placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
+          />
+          <Pressable
+            style={styles.showHideButton}
+            onPress={() => setShowCurrent(!showCurrent)}
+          >
+            <Text style={styles.showHideText}>{showCurrent ? "Hide" : "Show"}</Text>
+          </Pressable>
+        </View>
+
+        {/* New Password */}
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholder="New Password"
+            secureTextEntry={!showNew}
+            placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
+          />
+          <Pressable
+            style={styles.showHideButton}
+            onPress={() => setShowNew(!showNew)}
+          >
+            <Text style={styles.showHideText}>{showNew ? "Hide" : "Show"}</Text>
+          </Pressable>
+        </View>
+
+        {/* Confirm Password */}
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={[styles.input, darkMode && { backgroundColor: "#374151", color: "#F9FAFB" }]}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholder="Confirm New Password"
+            secureTextEntry={!showConfirm}
+            placeholderTextColor={darkMode ? "#9CA3AF" : "#6B7280"}
+          />
+          <Pressable
+            style={styles.showHideButton}
+            onPress={() => setShowConfirm(!showConfirm)}
+          >
+            <Text style={styles.showHideText}>{showConfirm ? "Hide" : "Show"}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.toggleRow}>
           <Text style={[styles.toggleText, darkMode && { color: "#F9FAFB" }]}>Dark Mode</Text>
@@ -242,6 +279,9 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: "600", marginBottom: 6, color: "#111827" },
   sectionTitle: { fontSize: 18, fontWeight: "700", marginTop: 20, marginBottom: 8, color: "#111827" },
   input: { backgroundColor: "#fff", padding: 12, borderRadius: 12, fontSize: 16, marginBottom: 16 },
+  passwordContainer: { position: "relative" },
+  showHideButton: { position: "absolute", right: 18, top: 14 },
+  showHideText: { color: "#3B82F6", fontWeight: "600" },
   toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   toggleText: { fontSize: 16, fontWeight: "600" },
   saveButton: { backgroundColor: "#10B981", padding: 16, borderRadius: 12, alignItems: "center", marginTop: 10 },
