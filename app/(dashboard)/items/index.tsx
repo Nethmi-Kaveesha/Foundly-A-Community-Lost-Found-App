@@ -16,6 +16,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -69,7 +70,7 @@ const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   </View>
 );
 
-// --------------------- Dropdown Component ---------------------
+// Dropdown Component
 const DropdownFilter = ({
   label,
   selected,
@@ -86,7 +87,6 @@ const DropdownFilter = ({
   setOpenDropdown: (val: string | null) => void;
 }) => {
   const isOpen = openDropdown === label;
-
   const opacity = useState(new Animated.Value(0))[0];
   const translateY = useState(new Animated.Value(-20))[0];
   const rotate = useState(new Animated.Value(0))[0];
@@ -174,7 +174,7 @@ const DropdownFilter = ({
   );
 };
 
-// --------------------- Main Screen ---------------------
+// Main Screen
 const FoundlyItemsScreen = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [statusFilter, setStatusFilter] = useState<"All" | "Lost" | "Found">("All");
@@ -187,6 +187,9 @@ const FoundlyItemsScreen = () => {
   const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
   const [matchedItems, setMatchedItems] = useState<Item[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   const router = useRouter();
   const { showLoader, hideLoader } = useLoader();
@@ -290,6 +293,7 @@ const FoundlyItemsScreen = () => {
 
   const filteredItems = applyFilters(items);
 
+  // Render item card
   const renderItemCard = (item: Item) => {
     const isNearby =
       userLocation && item.location?.lat && item.location?.lng
@@ -311,66 +315,73 @@ const FoundlyItemsScreen = () => {
           borderColor: isMatched ? "#FBBF24" : "transparent",
         }}
       >
-        <ImagePlaceholder photoURL={item.photoURL} />
-        <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
-          <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
-            {item.description}
-          </Text>
-          {(isNearby || isMatched) && (
-            <Text
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedItem(item);
+            setDetailModalVisible(true);
+          }}
+        >
+          <ImagePlaceholder photoURL={item.photoURL} />
+          <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+            <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
+              {item.description}
+            </Text>
+            {(isNearby || isMatched) && (
+              <Text
+                style={{
+                  textAlign: "center",
+                  marginTop: 4,
+                  fontSize: 12,
+                  fontWeight: "600",
+                  color: isMatched ? "#F59E0B" : "#10B981",
+                }}
+              >
+                {isMatched ? "⚡ Matched!" : "📍 Nearby"}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {item.userId === currentUser?.uid && (
+          <View style={{ flexDirection: "row", margin: 8, justifyContent: "space-between" }}>
+            <TouchableOpacity
+              onPress={() => router.push(`/items/${item.id}`)}
               style={{
-                textAlign: "center",
-                marginTop: 4,
-                fontSize: 12,
-                fontWeight: "600",
-                color: isMatched ? "#F59E0B" : "#10B981",
+                flex: 1,
+                marginRight: 4,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: "#FCD34D",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              {isMatched ? "⚡ Matched!" : "📍 Nearby"}
-            </Text>
-          )}
-          {item.userId === currentUser?.uid && (
-            <View style={{ flexDirection: "row", marginTop: 8, justifyContent: "space-between" }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  marginRight: 4,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: "#FCD34D",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onPress={() => item.id && router.push(`/items/${item.id}`)}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
-              </TouchableOpacity>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  marginLeft: 4,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: "#EF4444",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-                onPress={() => handleDelete(item.id)}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+            <TouchableOpacity
+              onPress={() => handleDelete(item.id)}
+              style={{
+                flex: 1,
+                marginLeft: 4,
+                height: 36,
+                borderRadius: 8,
+                backgroundColor: "#EF4444",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
 
-  // ------------------- Check Nearby / Match -------------------
   const handleCheckNearby = () => {
     if (!userLocation) return Alert.alert("Location Error", "User location not available");
 
@@ -408,7 +419,7 @@ const FoundlyItemsScreen = () => {
         <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
       </View>
 
-      {/* Search and Filters */}
+      {/* Search & Filters */}
       <View style={{ padding: 10 }}>
         <TextInput
           placeholder="Search items..."
@@ -500,8 +511,28 @@ const FoundlyItemsScreen = () => {
 
       {/* Nearby / Match Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center" }}>
-          <View style={{ backgroundColor: "white", margin: 20, borderRadius: 16, padding: 16 }}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, position: "relative" }}>
+            
+            {/* Close Button */}
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                backgroundColor: "#EF4444",
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <Ionicons name="close" size={20} color="white" />
+            </TouchableOpacity>
+
             {/* Tabs */}
             <View style={{ flexDirection: "row", marginBottom: 12 }}>
               {["Nearby", "Match"].map((tab) => (
@@ -528,12 +559,102 @@ const FoundlyItemsScreen = () => {
               renderItem={({ item }) => renderItemCard(item)}
               snapToInterval={screenWidth * 0.7 + 16}
               decelerationRate="fast"
-              contentContainerStyle={{ paddingHorizontal: 10 }}
+              contentContainerStyle={{ paddingHorizontal: 10, marginTop: 40 }}
             />
+          </View>
+        </View>
+      </Modal>
 
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={{ marginTop: 16, alignSelf: "center", padding: 8 }}>
-              <Text style={{ color: "#EF4444", fontWeight: "600" }}>Close</Text>
+      {/* Item Details Modal */}
+      <Modal visible={detailModalVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16, position: "relative" }}>
+            
+            {/* Close Button */}
+            <TouchableOpacity
+              onPress={() => setDetailModalVisible(false)}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                backgroundColor: "#EF4444",
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <Ionicons name="close" size={20} color="white" />
             </TouchableOpacity>
+
+            {selectedItem && (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {selectedItem.photoURL ? (
+                  <Image
+                    source={{ uri: selectedItem.photoURL }}
+                    style={{ width: "100%", height: 200, borderRadius: 12, marginBottom: 12 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: "100%",
+                      height: 200,
+                      borderRadius: 12,
+                      backgroundColor: "#E5E7EB",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text>No Image</Text>
+                  </View>
+                )}
+
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 6 }}>{selectedItem.title}</Text>
+                <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 12 }}>{selectedItem.description}</Text>
+
+                {selectedItem.location?.lat != null && selectedItem.location?.lng != null && (
+                  <View
+                    style={{
+                      backgroundColor: "#F3F4F6",
+                      padding: 12,
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Ionicons name="location-outline" size={20} color="#10B981" style={{ marginRight: 8 }} />
+                    <Text style={{ color: "#374151" }}>
+                      Lat: {selectedItem.location.lat.toFixed(4)}, Lng: {selectedItem.location.lng.toFixed(4)}
+                    </Text>
+                  </View>
+                )}
+
+                {selectedItem.contactInfo && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`tel:${selectedItem.contactInfo}`)}
+                    style={{
+                      backgroundColor: "#F3F4F6",
+                      padding: 12,
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Ionicons name="call-outline" size={20} color="#3B82F6" style={{ marginRight: 8 }} />
+                    <Text style={{ color: "#374151" }}>{selectedItem.contactInfo}</Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={{ fontSize: 14, color: "#374151", marginTop: 4 }}>Category: {selectedItem.category}</Text>
+                <Text style={{ fontSize: 14, color: "#374151", marginTop: 2 }}>Status: {selectedItem.status}</Text>
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>
