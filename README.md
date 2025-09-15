@@ -131,4 +131,5 @@ Web version using ReactJS.
 
 📄 License
 
-MIT License © [Your Name]
+MIT License © [NETHMI KAVEESHA FERNANDO]
+
