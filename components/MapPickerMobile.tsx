@@ -4,11 +4,38 @@ import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "reac
 import { WebView } from "react-native-webview";
 import type { MapPickerProps } from "./MapPicker.types";
 
-const MapPickerMobile: React.FC<MapPickerProps> = ({ location, onLocationSelect, markers = [] }) => {
+const MapPickerMobile: React.FC<MapPickerProps> = ({
+  location,
+  onLocationSelect,
+  markers = [],
+  onAddressChange, // <-- NEW
+}) => {
   const initialLat = location?.lat ?? 37.7749;
   const initialLng = location?.lng ?? -122.4194;
   const webviewRef = useRef<WebView>(null);
   const [searchInput, setSearchInput] = useState("");
+
+  // Fill address text
+  const fillAddress = async (lat: number, lng: number) => {
+    try {
+      const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (geocode.length > 0) {
+        const addr = `${geocode[0].name ?? ""}, ${geocode[0].city ?? ""}, ${geocode[0].region ?? ""}`;
+        setSearchInput(addr);
+        if (onAddressChange) onAddressChange(addr); // update parent
+      }
+    } catch (err) {
+      console.warn("Reverse geocode failed:", err);
+    }
+  };
+
+  // Fly to initial location
+  useEffect(() => {
+    if (location?.lat && location?.lng) {
+      webviewRef.current?.postMessage(JSON.stringify({ lat: location.lat, lng: location.lng }));
+      fillAddress(location.lat, location.lng);
+    }
+  }, [location]);
 
   const html = `
     <!DOCTYPE html>
@@ -50,25 +77,16 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({ location, onLocationSelect,
     </html>
   `;
 
-  // Fly to new location when `location` prop changes
-  useEffect(() => {
-    if (location?.lat && location?.lng) {
-      webviewRef.current?.postMessage(JSON.stringify({ lat: location.lat, lng: location.lng }));
-    }
-  }, [location]);
-
-  // Handle search input: geocode address and fly marker
+  // Search input: geocode and fly marker
   const handleSearch = async () => {
     if (!searchInput.trim()) return Alert.alert("Error", "Please type a location");
-
     try {
       const geocode = await Location.geocodeAsync(searchInput);
       if (geocode.length > 0) {
         const { latitude, longitude } = geocode[0];
-        // Send coordinates to WebView
         webviewRef.current?.postMessage(JSON.stringify({ lat: latitude, lng: longitude }));
-        // Update parent component
         onLocationSelect(latitude, longitude);
+        fillAddress(latitude, longitude); // update text field
       } else {
         Alert.alert("Not found", "Location not found");
       }
@@ -80,7 +98,6 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({ location, onLocationSelect,
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Search bar */}
       <View style={styles.searchContainer}>
         <TextInput
           placeholder="Search location"
@@ -93,7 +110,6 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({ location, onLocationSelect,
         </TouchableOpacity>
       </View>
 
-      {/* Map */}
       <WebView
         ref={webviewRef}
         originWhitelist={["*"]}
@@ -102,6 +118,7 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({ location, onLocationSelect,
         onMessage={(event) => {
           const coords = JSON.parse(event.nativeEvent.data);
           onLocationSelect(coords.lat, coords.lng);
+          fillAddress(coords.lat, coords.lng); // auto-fill text field
         }}
       />
     </View>
