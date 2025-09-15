@@ -1,12 +1,15 @@
 "use client";
 
 import type { MarkerType } from "@/components/MapPicker.types";
+import { db } from "@/firebase";
 import { createItem } from "@/services/itemService";
 import type { Item, ItemLocation } from "@/types/item";
 import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import dynamic from "next/dynamic";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Image, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -31,6 +34,10 @@ const getValidLocation = (loc?: ItemLocation) =>
   loc?.lat !== undefined && loc?.lng !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined;
 
 const FoundlyItemFormScreen: React.FC = () => {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const isEditMode = !!id && id !== "new"; // if id exists and not "new", it's edit mode
+  const router = useRouter();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Lost" | "Found">("Lost");
@@ -42,6 +49,35 @@ const FoundlyItemFormScreen: React.FC = () => {
 
   const auth = getAuth();
   const currentUser = auth.currentUser;
+
+  // Fetch item details if editing
+  useEffect(() => {
+    if (!isEditMode) return; // create mode, no fetch
+    const fetchItem = async () => {
+      try {
+        const docRef = doc(db, "items", id!);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+          const data = snap.data() as Item;
+          setTitle(data.title || "");
+          setDescription(data.description || "");
+          setStatus(data.status || "Lost");
+          setCategory(data.category || "");
+          setContact(data.contactInfo || "");
+          setImageUri(data.photoURL || null);
+          if (data.location?.lat != null && data.location?.lng != null) {
+            setItemLocation({ lat: data.location.lat, lng: data.location.lng });
+          }
+        } else {
+          Toast.show({ type: "error", text1: "Item not found" });
+        }
+      } catch (err) {
+        console.error("Failed to fetch item:", err);
+        Toast.show({ type: "error", text1: "Failed to fetch item" });
+      }
+    };
+    fetchItem();
+  }, [id]);
 
   // Pick image
   const pickImage = async () => {
@@ -56,7 +92,7 @@ const FoundlyItemFormScreen: React.FC = () => {
     }
   };
 
-  // Save item
+  // Save or update item
   const handleSubmit = async () => {
     if (!title.trim()) return Toast.show({ type: "error", text1: "Title is required" });
     if (!category) return Toast.show({ type: "error", text1: "Select a category" });
@@ -65,48 +101,43 @@ const FoundlyItemFormScreen: React.FC = () => {
     if (!currentUser) return Toast.show({ type: "error", text1: "You must be logged in" });
 
     try {
-      const newItem: Item = {
+      const itemData: Partial<Item> = {
         title,
         description,
         status,
         category,
         contactInfo: contact,
         photoURL: imageUri || undefined,
-        location: itemLocation,
+        location: Object.keys(itemLocation).length ? itemLocation : undefined,
         userId: currentUser.uid,
       };
 
-      // Save to Firestore
-      await createItem(newItem);
+      if (isEditMode) {
+        // Edit mode: update item
+        const cleanData = Object.fromEntries(
+          Object.entries(itemData).filter(([_, v]) => v !== undefined && v !== null)
+        );
+        await updateDoc(doc(db, "items", id!), cleanData);
+        Toast.show({ type: "success", text1: "Item updated successfully" });
+      } else {
+        // Create mode: save new item
+        await createItem(itemData as Item);
+        Toast.show({ type: "success", text1: "Item saved successfully" });
 
-      // Show toast
-      Toast.show({
-        type: "success",
-        text1: "Item saved successfully!",
-        position: "top",
-        visibilityTime: 2000,
-      });
+        // Clear form
+        setTitle("");
+        setDescription("");
+        setStatus("Lost");
+        setCategory("");
+        setContact("");
+        setImageUri(null);
+        setItemLocation({});
+      }
 
-      // Show custom success modal
       setSuccessModalVisible(true);
-
-      // Clear form
-      setTitle("");
-      setDescription("");
-      setStatus("Lost");
-      setCategory("");
-      setContact("");
-      setImageUri(null);
-      setItemLocation({});
     } catch (err: any) {
       console.error(err);
-      Toast.show({
-        type: "error",
-        text1: "Failed to save item",
-        text2: err.message || "Something went wrong",
-        position: "top",
-        visibilityTime: 2000,
-      });
+      Toast.show({ type: "error", text1: "Failed to save item", text2: err.message || "Something went wrong" });
     }
   };
 
@@ -166,23 +197,18 @@ const FoundlyItemFormScreen: React.FC = () => {
         {validLocation && <Text style={{ color: "#6B7280", marginBottom: 12 }}>Selected Location: Lat {itemLocation.lat?.toFixed(4)}, Lng {itemLocation.lng?.toFixed(4)}</Text>}
 
         <TouchableOpacity onPress={handleSubmit} style={{ backgroundColor: "#3B82F6", paddingVertical: 16, borderRadius: 24, alignItems: "center" }}>
-          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>Submit</Text>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>{isEditMode ? "Update Item" : "Save Item"}</Text>
         </TouchableOpacity>
 
         <Toast />
 
         {/* Success Modal */}
-        <Modal
-          visible={successModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSuccessModalVisible(false)}
-        >
+        <Modal visible={successModalVisible} transparent animationType="fade" onRequestClose={() => setSuccessModalVisible(false)}>
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)" }}>
             <View style={{ width: 300, backgroundColor: "#fff", padding: 20, borderRadius: 12 }}>
               <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 12 }}>Success!</Text>
-              <Text style={{ marginBottom: 20 }}>Your item has been saved successfully.</Text>
-              <TouchableOpacity onPress={() => setSuccessModalVisible(false)} style={{ backgroundColor: "#3B82F6", padding: 12, borderRadius: 8 }}>
+              <Text style={{ marginBottom: 20 }}>{isEditMode ? "Item updated successfully." : "Your item has been saved successfully."}</Text>
+              <TouchableOpacity onPress={() => { setSuccessModalVisible(false); if(!isEditMode) router.back(); }} style={{ backgroundColor: "#3B82F6", padding: 12, borderRadius: 8 }}>
                 <Text style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>OK</Text>
               </TouchableOpacity>
             </View>
