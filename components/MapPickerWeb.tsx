@@ -1,143 +1,215 @@
-"use client";
+import * as Location from "expo-location";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { WebView } from "react-native-webview";
+import type { MapPickerProps, MarkerType } from "./MapPicker.types";
 
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import React, { useEffect, useState } from "react";
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import type { MapPickerProps } from "./MapPicker.types";
-
-// Fix default marker icons
-const DefaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
-});
-L.Marker.prototype.options.icon = DefaultIcon;
-
-const MapPickerWeb: React.FC<MapPickerProps> = ({ location, onLocationSelect, markers = [] }) => {
-  const [selected, setSelected] = useState(location ?? null);
+const MapPickerMobile: React.FC<MapPickerProps> = ({ location, markers = [], onLocationSelect }) => {
+  const webviewRef = useRef<WebView>(null);
   const [searchInput, setSearchInput] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Sync selected state when location prop changes (important for editing)
-  useEffect(() => {
-    if (location) {
-      setSelected(location);
-
-      // Reverse geocode to show address in text field
-      (async () => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`
-          );
-          const data = await res.json();
-          if (data?.display_name) setSearchInput(data.display_name);
-        } catch {
-          console.warn("Failed to reverse geocode location");
-        }
-      })();
+  // Reverse geocode helper
+  const fillAddress = async (lat: number, lng: number) => {
+    try {
+      const [address] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (address) {
+        const formatted = [
+          address.name,
+          address.street,
+          address.city,
+          address.region,
+          address.postalCode,
+          address.country,
+        ].filter(Boolean).join(", ");
+        setSearchInput(formatted);
+      }
+    } catch (err) {
+      console.warn("Reverse geocode failed", err);
     }
-  }, [location]);
+  };
 
-  // Handle map click
-  const handleMapClick = (e: any) => {
-    const { lat, lng } = e.latlng;
-    setSelected({ lat, lng });
-    onLocationSelect(lat, lng);
-
-    // Reverse geocode clicked location
+  // Initialize coordinates
+  useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
-        );
-        const data = await res.json();
-        if (data?.display_name) setSearchInput(data.display_name);
-      } catch {
-        console.warn("Failed to reverse geocode clicked location");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission denied", "Location permission is required.");
+          return;
+        }
+
+        let lat: number, lng: number;
+
+        if (location?.lat != null && location?.lng != null) {
+          lat = location.lat;
+          lng = location.lng;
+        } else {
+          const current = await Location.getCurrentPositionAsync({});
+          lat = current.coords.latitude;
+          lng = current.coords.longitude;
+        }
+
+        setCoords({ lat, lng });
+        await fillAddress(lat, lng);
+        onLocationSelect(lat, lng);
+
+        setTimeout(() => {
+          webviewRef.current?.postMessage(JSON.stringify({ lat, lng }));
+        }, 500);
+      } catch (err) {
+        console.error(err);
+        Alert.alert("Error", "Failed to get location");
       }
     })();
-  };
+  }, [location]);
 
-  // Search typed address
-  const handleLocateAddress = async () => {
-    if (!searchInput.trim()) return alert("Please type a location");
+  if (!coords) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Loading map...</Text>
+      </View>
+    );
+  }
 
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchInput)}`
-      );
-      const data = await res.json();
-      if (data.length > 0) {
-        const { lat, lon } = data[0];
-        const coords = { lat: parseFloat(lat), lng: parseFloat(lon) };
-        setSelected(coords);
-        onLocationSelect(coords.lat, coords.lng);
-      } else {
-        alert("Location not found");
-      }
-    } catch {
-      alert("Failed to locate address");
+  // Handle map clicks
+  const handleMapClick = async (event: any) => {
+    const data = JSON.parse(event.nativeEvent.data);
+    if (data.lat && data.lng) {
+      setCoords({ lat: data.lat, lng: data.lng });
+      await fillAddress(data.lat, data.lng);
+      onLocationSelect(data.lat, data.lng);
     }
   };
 
+  // Handle address search
+  const handleSearch = async () => {
+    if (!searchInput.trim()) return Alert.alert("Error", "Please type a location");
+
+    try {
+      const geocode = await Location.geocodeAsync(searchInput);
+      if (geocode.length > 0) {
+        const { latitude, longitude } = geocode[0];
+        setCoords({ lat: latitude, lng: longitude });
+        webviewRef.current?.postMessage(JSON.stringify({ lat: latitude, lng: longitude }));
+        await fillAddress(latitude, longitude);
+        onLocationSelect(latitude, longitude);
+      } else {
+        Alert.alert("Not found", "Location not found");
+      }
+    } catch {
+      Alert.alert("Error", "Failed to locate address");
+    }
+  };
+
+  // Prepare all markers: selected + extra markers
+  const allMarkers: MarkerType[] = [
+    ...(coords ? [{ id: "selected", lat: coords.lat, lng: coords.lng }] : []),
+    ...markers,
+  ];
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+      <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+      <style>html, body, #map { height: 100%; margin: 0; padding: 0; }</style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map').setView([${coords.lat}, ${coords.lng}], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        var markers = {};
+
+        // Add initial markers
+        ${allMarkers.map(m => `
+          markers["${m.id}"] = L.marker([${m.lat}, ${m.lng}]).addTo(map)${m.title ? `.bindPopup("${m.title}")` : ""};
+        `).join("")}
+
+        // Handle map click
+        map.on('click', function(e) {
+          var coords = e.latlng;
+          if(markers["selected"]) {
+            markers["selected"].setLatLng(coords);
+          } else {
+            markers["selected"] = L.marker([coords.lat, coords.lng]).addTo(map);
+          }
+          window.ReactNativeWebView.postMessage(JSON.stringify(coords));
+        });
+
+        function flyTo(lat, lng) {
+          if(markers["selected"]) {
+            markers["selected"].setLatLng([lat, lng]);
+          } else {
+            markers["selected"] = L.marker([lat, lng]).addTo(map);
+          }
+          map.flyTo([lat, lng], 13);
+        }
+
+        window.addEventListener('message', function(event) {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.lat && data.lng) flyTo(data.lat, data.lng);
+          } catch(e) { console.error(e); }
+        });
+      </script>
+    </body>
+    </html>
+  `;
+
   return (
-    <div style={{ height: "100%", width: "100%" }}>
-      {/* Address search input */}
-      <div style={{ display: "flex", marginBottom: 8 }}>
-        <input
-          type="text"
+    <View style={{ flex: 1 }}>
+      <View style={styles.searchContainer}>
+        <TextInput
+          placeholder="Search location"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Type location"
-          style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid #ccc" }}
+          onChangeText={setSearchInput}
+          style={styles.input}
         />
-        <button
-          onClick={handleLocateAddress}
-          style={{ marginLeft: 4, padding: "8px 16px", borderRadius: 8, backgroundColor: "#3B82F6", color: "#fff" }}
-        >
-          Go
-        </button>
-      </div>
+        <TouchableOpacity onPress={handleSearch} style={styles.button}>
+          <Text style={{ color: "#fff", fontWeight: "600" }}>Go</Text>
+        </TouchableOpacity>
+      </View>
 
-      <MapContainer
-        center={[location?.lat ?? 37.7749, location?.lng ?? -122.4194]}
-        zoom={13}
-        style={{ height: "400px", width: "100%" }}
-      >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <MapClick onClick={handleMapClick} />
-        <FlyToMarker location={selected} />
-
-        {/* Selected marker */}
-        {selected && (
-          <Marker position={[selected.lat, selected.lng]}>
-            <Popup>Selected Location</Popup>
-          </Marker>
-        )}
-
-        {/* Extra markers */}
-        {markers.map((m) => (
-          <Marker key={m.id} position={[m.lat, m.lng]}>
-            {m.title && <Popup>{m.title}</Popup>}
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+      <WebView
+        ref={webviewRef}
+        originWhitelist={["*"]}
+        source={{ html }}
+        style={{ flex: 1 }}
+        onMessage={handleMapClick}
+      />
+    </View>
   );
 };
 
-// Handle map clicks
-const MapClick: React.FC<{ onClick: (e: any) => void }> = ({ onClick }) => {
-  useMapEvents({ click: onClick });
-  return null;
-};
+const styles = StyleSheet.create({
+  searchContainer: {
+    flexDirection: "row",
+    padding: 8,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#D1D5DB",
+  },
+  input: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  button: {
+    backgroundColor: "#3B82F6",
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+});
 
-// Fly to selected marker
-const FlyToMarker: React.FC<{ location: { lat: number; lng: number } | null }> = ({ location }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (location) map.flyTo([location.lat, location.lng], 13);
-  }, [location, map]);
-  return null;
-};
-
-export default MapPickerWeb;
+export default MapPickerMobile;
