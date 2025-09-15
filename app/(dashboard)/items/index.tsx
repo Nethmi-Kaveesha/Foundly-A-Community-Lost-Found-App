@@ -2,9 +2,9 @@
 
 import { useLoader } from "@/context/LoaderContext";
 import { deleteItem, itemColRef } from "@/services/itemService";
-import { findMatchingItem } from "@/services/matchService";
 import { Item } from "@/types/item";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
@@ -12,18 +12,15 @@ import { onSnapshot } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Animated,
   Dimensions,
-  FlatList,
   Image,
-  Linking,
   Modal,
   Platform,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toast from "react-native-toast-message";
@@ -44,7 +41,7 @@ const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) =
   return R * c;
 };
 
-// Image placeholder component
+// Image placeholder
 const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 8 }}>
     {photoURL ? (
@@ -70,111 +67,6 @@ const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   </View>
 );
 
-// Dropdown Component
-const DropdownFilter = ({
-  label,
-  selected,
-  options,
-  onSelect,
-  openDropdown,
-  setOpenDropdown,
-}: {
-  label: string;
-  selected: string;
-  options: string[];
-  onSelect: (val: string) => void;
-  openDropdown: string | null;
-  setOpenDropdown: (val: string | null) => void;
-}) => {
-  const isOpen = openDropdown === label;
-  const opacity = useState(new Animated.Value(0))[0];
-  const translateY = useState(new Animated.Value(-20))[0];
-  const rotate = useState(new Animated.Value(0))[0];
-
-  useEffect(() => {
-    if (isOpen) {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 200, useNativeDriver: true }),
-        Animated.timing(rotate, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: -20, duration: 150, useNativeDriver: true }),
-        Animated.timing(rotate, { toValue: 0, duration: 150, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [isOpen]);
-
-  const rotation = rotate.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] });
-
-  return (
-    <View style={{ marginRight: 8 }}>
-      <TouchableOpacity
-        onPress={() => setOpenDropdown(isOpen ? null : label)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          backgroundColor: selected !== "All" ? "#3B82F6" : "#E5E7EB",
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          borderRadius: 20,
-        }}
-      >
-        <Text style={{ color: selected !== "All" ? "#fff" : "#374151", fontWeight: "500" }}>
-          {label}: {selected}
-        </Text>
-        <Animated.View style={{ marginLeft: 6, transform: [{ rotate: rotation }] }}>
-          <Ionicons name="chevron-down" size={16} color={selected !== "All" ? "#fff" : "#374151"} />
-        </Animated.View>
-      </TouchableOpacity>
-
-      {isOpen && (
-        <Modal transparent visible={isOpen} animationType="none">
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setOpenDropdown(null)}>
-            <Animated.View
-              style={{
-                position: "absolute",
-                top: 50,
-                left: 10,
-                backgroundColor: "#fff",
-                borderRadius: 12,
-                paddingVertical: 4,
-                minWidth: 120,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 5,
-                opacity: opacity,
-                transform: [{ translateY: translateY }],
-              }}
-            >
-              {options.map((opt) => (
-                <TouchableOpacity
-                  key={opt}
-                  onPress={() => {
-                    onSelect(opt);
-                    setOpenDropdown(null);
-                  }}
-                  style={{ padding: 10 }}
-                >
-                  <Text style={{ color: opt === selected ? "#3B82F6" : "#374151", fontWeight: "500" }}>
-                    {opt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </Animated.View>
-          </TouchableOpacity>
-        </Modal>
-      )}
-    </View>
-  );
-};
-
-// Main Screen
 const FoundlyItemsScreen = () => {
   const [items, setItems] = useState<Item[]>([]);
   const [statusFilter, setStatusFilter] = useState<"All" | "Lost" | "Found">("All");
@@ -186,7 +78,6 @@ const FoundlyItemsScreen = () => {
   const [activeTab, setActiveTab] = useState<"Nearby" | "Match">("Nearby");
   const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
   const [matchedItems, setMatchedItems] = useState<Item[]>([]);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
@@ -195,7 +86,7 @@ const FoundlyItemsScreen = () => {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Get user location
+  // User location
   useEffect(() => {
     const getLocation = async () => {
       try {
@@ -219,7 +110,7 @@ const FoundlyItemsScreen = () => {
     getLocation();
   }, []);
 
-  // Load all items
+  // Load items
   useEffect(() => {
     showLoader();
     const unsubscribe = onSnapshot(
@@ -261,7 +152,7 @@ const FoundlyItemsScreen = () => {
     ]);
   };
 
-  // Apply filters and sort
+  // Filter items
   const applyFilters = (list: Item[]) => {
     let filtered = list
       .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
@@ -286,11 +177,69 @@ const FoundlyItemsScreen = () => {
         return distA - distB;
       });
     }
-
     return filtered;
   };
 
   const filteredItems = applyFilters(items);
+
+  // Matching logic
+  const findMatchingItem = (item: Item, allItems: Item[]) => {
+    return allItems.find(
+      (i) =>
+        i.id !== item.id &&
+        i.category === item.category &&
+        i.title.toLowerCase() === item.title.toLowerCase()
+    );
+  };
+
+  // Nearby & Match
+  const handleCheckNearby = () => {
+    if (!userLocation) return Alert.alert("Location Error", "User location not available");
+
+    const nearbyRaw = items.filter(
+      (i) =>
+        i.location?.lat != null &&
+        i.location?.lng != null &&
+        getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
+    );
+
+    const nearby = applyFilters(nearbyRaw);
+
+    const matchedSet = new Set<string>();
+    const matched: Item[] = [];
+
+    nearby.forEach((item) => {
+      const match = findMatchingItem(item, items);
+      if (match) {
+        const matchId = match.id || match.title + match.category;
+        if (!matchedSet.has(matchId)) {
+          matched.push(match);
+          matchedSet.add(matchId);
+        }
+      }
+    });
+
+    setNearbyItems(nearby);
+    setMatchedItems(matched);
+    setActiveTab(matched.length > 0 ? "Match" : "Nearby");
+    setModalVisible(true);
+
+    if (nearby.length === 0) Toast.show({ type: "info", text1: "Nearby Items Not Found" });
+    else
+      Toast.show({
+        type: "info",
+        text1: "Nearby Items Found",
+        text2: `Found ${nearby.length} nearby items!`,
+      });
+
+    if (matched.length === 0) Toast.show({ type: "error", text1: "No Matches Found" });
+    else
+      Toast.show({
+        type: "success",
+        text1: "Matches Found",
+        text2: `Found ${matched.length} matches!`,
+      });
+  };
 
   // Render item card
   const renderItemCard = (item: Item) => {
@@ -298,7 +247,22 @@ const FoundlyItemsScreen = () => {
       userLocation && item.location?.lat && item.location?.lng
         ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
         : false;
+
     const isMatched = !!findMatchingItem(item, items);
+
+    const isSearchMatch =
+      searchKeyword &&
+      (item.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchKeyword.toLowerCase()));
+
+    // Ribbons
+    const ribbons: { color: string; text: string }[] = [];
+
+    if (isMatched && isNearby) ribbons.push({ color: "#EF4444", text: "⚡ MATCH & 📍 NEARBY" });
+    else if (isMatched) ribbons.push({ color: "#FBBF24", text: "MATCH!" });
+    else if (isNearby) ribbons.push({ color: "#10B981", text: "NEARBY" });
+
+    if (isSearchMatch) ribbons.push({ color: "#3B82F6", text: "🔍 Keyword" });
 
     return (
       <View
@@ -310,17 +274,47 @@ const FoundlyItemsScreen = () => {
           marginBottom: 12,
           overflow: "hidden",
           elevation: 3,
-          borderWidth: isMatched ? 2 : 0,
-          borderColor: isMatched ? "#FBBF24" : "transparent",
         }}
       >
         <TouchableOpacity
           onPress={() => {
             setSelectedItem(item);
-            setDetailModalVisible(true);
+            setDetailModalVisible(true); // open modal
           }}
         >
-          <ImagePlaceholder photoURL={item.photoURL} />
+          <View style={{ position: "relative" }}>
+            <ImagePlaceholder photoURL={item.photoURL} />
+
+            {/* Render ribbons */}
+            {ribbons.map((r, idx) => (
+              <View
+                key={idx}
+                style={{
+                  position: "absolute",
+                  top: 10 + idx * 20,
+                  left: -40,
+                  width: 140,
+                  transform: [{ rotate: "-45deg" }],
+                  backgroundColor: r.color,
+                  paddingVertical: 4,
+                  zIndex: 10,
+                  elevation: 5,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    fontSize: 12,
+                  }}
+                >
+                  {r.text}
+                </Text>
+              </View>
+            ))}
+          </View>
+
           <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
             <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
               {item.title}
@@ -328,19 +322,6 @@ const FoundlyItemsScreen = () => {
             <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
               {item.description}
             </Text>
-            {(isNearby || isMatched) && (
-              <Text
-                style={{
-                  textAlign: "center",
-                  marginTop: 4,
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color: isMatched ? "#F59E0B" : "#10B981",
-                }}
-              >
-                {isMatched ? "⚡ Matched!" : "📍 Nearby"}
-              </Text>
-            )}
           </View>
         </TouchableOpacity>
 
@@ -381,45 +362,15 @@ const FoundlyItemsScreen = () => {
     );
   };
 
-  // Check nearby and matches
-  const handleCheckNearby = () => {
-    if (!userLocation) return Alert.alert("Location Error", "User location not available");
-
-    const nearbyRaw = items.filter(
-      (i) =>
-        i.location?.lat != null &&
-        i.location?.lng != null &&
-        getDistanceKm(userLocation.lat, userLocation.lng, i.location.lat, i.location.lng) <= 5
-    );
-
-    const nearby = applyFilters(nearbyRaw);
-    const matched: Item[] = [];
-    nearby.forEach((item) => {
-      const match = findMatchingItem(item, items);
-      if (match) matched.push(match);
-    });
-    const matchedFiltered = applyFilters(matched);
-
-    setNearbyItems(nearby);
-    setMatchedItems(matchedFiltered);
-    setActiveTab("Nearby");
-    setModalVisible(true);
-
-    if (nearby.length)
-      Toast.show({ type: "info", text1: "Nearby Items Found", text2: `Found ${nearby.length} nearby items!` });
-    if (matchedFiltered.length)
-      Toast.show({ type: "success", text1: "Matches Found", text2: `Found ${matchedFiltered.length} matches!` });
-  };
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
+    <SafeAreaView edges={["bottom"]} className="flex-1 bg-gray-100">
       {/* Header */}
-      <View style={{ padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }}>
-        <Text style={{ fontSize: 24, fontWeight: "bold" }}>Foundly</Text>
+      <View className="px-5 py-4 flex-row justify-between items-center bg-white shadow">
+        <Text className="text-2xl font-bold text-gray-900">Foundly</Text>
         <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
       </View>
 
-      {/* Search & Filters */}
+      {/* Search */}
       <View style={{ padding: 10 }}>
         <TextInput
           placeholder="Search items..."
@@ -427,37 +378,73 @@ const FoundlyItemsScreen = () => {
           onChangeText={setSearchKeyword}
           style={{ backgroundColor: "#fff", padding: 10, borderRadius: 12, marginBottom: 6 }}
         />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: "row" }}>
-          <DropdownFilter
-            label="Status"
-            selected={statusFilter}
-            options={["All", "Lost", "Found"]}
-            onSelect={(val) => setStatusFilter(val as any)}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-          />
-          <DropdownFilter
-            label="Category"
-            selected={categoryFilter}
-            options={["All", "Pets", "Electronics", "Bags", "Keys"]}
-            onSelect={setCategoryFilter}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-          />
-          <DropdownFilter
-            label="Sort"
-            selected={sortOption}
-            options={["Newest", "Nearest"]}
-            onSelect={setSortOption}
-            openDropdown={openDropdown}
-            setOpenDropdown={setOpenDropdown}
-          />
-        </ScrollView>
+      </View>
+
+      {/* Combined Filters */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          paddingHorizontal: 10,
+          marginBottom: 10,
+        }}
+      >
+        {/* Category Picker */}
+        <View
+          style={{
+            flex: 1,
+            marginRight: 6,
+            backgroundColor: "#fff",
+            borderRadius: 12,
+            overflow: "hidden",
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+          }}
+        >
+          <Picker
+            selectedValue={categoryFilter}
+            onValueChange={(val) => setCategoryFilter(val)}
+            dropdownIconColor="#3B82F6"
+          >
+            <Picker.Item label="📦 All Categories" value="All" />
+            <Picker.Item label="🐶 Pets" value="Pets" />
+            <Picker.Item label="💻 Electronics" value="Electronics" />
+            <Picker.Item label="🎒 Bags" value="Bags" />
+            <Picker.Item label="🔑 Keys" value="Keys" />
+          </Picker>
+        </View>
+
+        {/* Status Picker */}
+        <View
+          style={{
+            flex: 1,
+            marginLeft: 6,
+            backgroundColor: "#fff",
+            borderRadius: 12,
+            overflow: "hidden",
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+          }}
+        >
+          <Picker
+            selectedValue={statusFilter}
+            onValueChange={(val) => setStatusFilter(val as "All" | "Lost" | "Found")}
+            dropdownIconColor="#10B981"
+          >
+            <Picker.Item label="📋 All Status" value="All" />
+            <Picker.Item label="❌ Lost" value="Lost" />
+            <Picker.Item label="✅ Found" value="Found" />
+          </Picker>
+        </View>
       </View>
 
       {/* Check Nearby / Match Button */}
       <View style={{ padding: 10 }}>
-        <TouchableOpacity onPress={handleCheckNearby} disabled={!userLocation || items.length === 0} activeOpacity={0.8}>
+        <TouchableOpacity
+          onPress={handleCheckNearby}
+          disabled={!userLocation || items.length === 0}
+          activeOpacity={0.8}
+        >
           <LinearGradient
             colors={["#34D399", "#10B981"]}
             start={[0, 0]}
@@ -509,64 +496,11 @@ const FoundlyItemsScreen = () => {
         <MaterialIcons name="add" size={32} color="white" />
       </TouchableOpacity>
 
-      {/* Nearby / Match Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
-          <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, position: "relative" }}>
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={{
-                position: "absolute",
-                top: 12,
-                right: 12,
-                backgroundColor: "#EF4444",
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 10,
-              }}
-            >
-              <Ionicons name="close" size={20} color="white" />
-            </TouchableOpacity>
-
-            {/* Tabs */}
-            <View style={{ flexDirection: "row", marginBottom: 12 }}>
-              {["Nearby", "Match"].map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveTab(tab as "Nearby" | "Match")}
-                  style={{
-                    flex: 1,
-                    padding: 8,
-                    borderBottomWidth: 2,
-                    borderBottomColor: activeTab === tab ? "#3B82F6" : "transparent",
-                  }}
-                >
-                  <Text style={{ textAlign: "center", fontWeight: "600" }}>{tab}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <FlatList
-              data={activeTab === "Nearby" ? nearbyItems : matchedItems}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id || Math.random().toString()}
-              renderItem={({ item }) => renderItemCard(item)}
-              snapToInterval={screenWidth * 0.7 + 16}
-              decelerationRate="fast"
-              contentContainerStyle={{ paddingHorizontal: 10, marginTop: 40 }}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Item Details Modal */}
-      <Modal visible={detailModalVisible} transparent animationType="slide">
+      {/* Details Modal */}
+      <Modal visible={detailModalVisible} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
           <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16, position: "relative" }}>
+            {/* Close button */}
             <TouchableOpacity
               onPress={() => setDetailModalVisible(false)}
               style={{
@@ -587,75 +521,60 @@ const FoundlyItemsScreen = () => {
 
             {selectedItem && (
               <ScrollView showsVerticalScrollIndicator={false}>
-                {selectedItem.photoURL ? (
-                  <Image
-                    source={{ uri: selectedItem.photoURL }}
-                    style={{ width: "100%", height: 200, borderRadius: 12, marginBottom: 12 }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={{
-                      width: "100%",
-                      height: 200,
-                      borderRadius: 12,
-                      backgroundColor: "#E5E7EB",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <Text>No Image</Text>
+                <ImagePlaceholder photoURL={selectedItem.photoURL} />
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginVertical: 8 }}>
+                  {selectedItem.title}
+                </Text>
+                <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 8 }}>
+                  {selectedItem.description}
+                </Text>
+                <Text style={{ fontSize: 14 }}>📂 Category: {selectedItem.category}</Text>
+                <Text style={{ fontSize: 14 }}>📌 Status: {selectedItem.status}</Text>
+
+                {selectedItem.userId === currentUser?.uid && (
+                  <View style={{ flexDirection: "row", marginTop: 12 }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setDetailModalVisible(false);
+                        router.push(`/items/${selectedItem.id}`);
+                      }}
+                      style={{
+                        flex: 1,
+                        marginRight: 4,
+                        height: 36,
+                        borderRadius: 8,
+                        backgroundColor: "#FCD34D",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setDetailModalVisible(false);
+                        handleDelete(selectedItem.id);
+                      }}
+                      style={{
+                        flex: 1,
+                        marginLeft: 4,
+                        height: 36,
+                        borderRadius: 8,
+                        backgroundColor: "#EF4444",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
+                    </TouchableOpacity>
                   </View>
                 )}
-
-                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 6 }}>{selectedItem.title}</Text>
-                <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 12 }}>{selectedItem.description}</Text>
-
-                {selectedItem.location?.lat != null && selectedItem.location?.lng != null && (
-                  <View
-                    style={{
-                      backgroundColor: "#F3F4F6",
-                      padding: 12,
-                      borderRadius: 12,
-                      marginBottom: 12,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Ionicons name="location-outline" size={20} color="#10B981" style={{ marginRight: 8 }} />
-                    <Text style={{ color: "#374151" }}>
-                      Lat: {selectedItem.location.lat.toFixed(4)}, Lng: {selectedItem.location.lng.toFixed(4)}
-                    </Text>
-                  </View>
-                )}
-
-                {selectedItem.contactInfo && (
-                  <TouchableOpacity
-                    onPress={() => Linking.openURL(`tel:${selectedItem.contactInfo}`)}
-                    style={{
-                      backgroundColor: "#F3F4F6",
-                      padding: 12,
-                      borderRadius: 12,
-                      marginBottom: 12,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Ionicons name="call-outline" size={20} color="#3B82F6" style={{ marginRight: 8 }} />
-                    <Text style={{ color: "#374151" }}>{selectedItem.contactInfo}</Text>
-                  </TouchableOpacity>
-                )}
-
-                <Text style={{ fontSize: 14, color: "#374151", marginTop: 4 }}>Category: {selectedItem.category}</Text>
-                <Text style={{ fontSize: 14, color: "#374151", marginTop: 2 }}>Status: {selectedItem.status}</Text>
               </ScrollView>
             )}
           </View>
         </View>
       </Modal>
-
-      <Toast />
     </SafeAreaView>
   );
 };
