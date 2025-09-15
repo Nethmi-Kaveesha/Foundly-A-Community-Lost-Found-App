@@ -17,11 +17,44 @@ const MapPickerWeb: React.FC<MapPickerProps> = ({ location, onLocationSelect, ma
   const [selected, setSelected] = useState(location ?? null);
   const [searchInput, setSearchInput] = useState("");
 
+  // Sync selected state when location prop changes (important for editing)
+  useEffect(() => {
+    if (location) {
+      setSelected(location);
+
+      // Reverse geocode to show address in text field
+      (async () => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.lat}&lon=${location.lng}`
+          );
+          const data = await res.json();
+          if (data?.display_name) setSearchInput(data.display_name);
+        } catch {
+          console.warn("Failed to reverse geocode location");
+        }
+      })();
+    }
+  }, [location]);
+
   // Handle map click
   const handleMapClick = (e: any) => {
     const { lat, lng } = e.latlng;
     setSelected({ lat, lng });
     onLocationSelect(lat, lng);
+
+    // Reverse geocode clicked location
+    (async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        );
+        const data = await res.json();
+        if (data?.display_name) setSearchInput(data.display_name);
+      } catch {
+        console.warn("Failed to reverse geocode clicked location");
+      }
+    })();
   };
 
   // Search typed address
@@ -74,12 +107,14 @@ const MapPickerWeb: React.FC<MapPickerProps> = ({ location, onLocationSelect, ma
         <MapClick onClick={handleMapClick} />
         <FlyToMarker location={selected} />
 
+        {/* Selected marker */}
         {selected && (
           <Marker position={[selected.lat, selected.lng]}>
             <Popup>Selected Location</Popup>
           </Marker>
         )}
 
+        {/* Extra markers */}
         {markers.map((m) => (
           <Marker key={m.id} position={[m.lat, m.lng]}>
             {m.title && <Popup>{m.title}</Popup>}
