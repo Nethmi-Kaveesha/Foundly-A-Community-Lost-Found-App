@@ -112,9 +112,11 @@ const Login = () => {
             <Text style={styles.rememberMeText}>Remember me</Text>
           </View>
 
-          <Pressable onPress={() => Alert.alert("Forgot Password", "Password reset flow")}>
-            <Text style={styles.forgotPassword}>Forgot your password?</Text>
-          </Pressable>
+          <Pressable onPress={() => router.push("./ForgotPassword")}>
+  <Text style={styles.forgotPassword}>Forgot your password?</Text>
+</Pressable>
+
+
         </View>
 
         {/* Login Button */}
