@@ -1,31 +1,35 @@
 import { Item } from "@/types/item";
-import { getDistanceInKm } from "@/utils/distance";
 
-export const findMatchingItem = (newItem: Item, allItems: Item[]): Item | null => {
-  const oppositeStatus = newItem.status === "Lost" ? "Found" : "Lost";
+// Return the first matching item with opposite status, same category, and fuzzy title match
+export const findMatchingItem = (item: Item, items: Item[]): Item | null => {
+  const clean = (str: string) =>
+    str
+      .toLowerCase()
+      .replace(/[^\w\s]/gi, "")
+      .split(" ")
+      .filter(Boolean);
 
-  return allItems.find(item => {
-    if (item.status !== oppositeStatus) return false;
-    if (item.category !== newItem.category) return false;
+  const newItemWords = clean(item.title);
 
-    // Optional location check
-    if (newItem.location?.latitude && newItem.location?.longitude &&
-        item.location?.latitude && item.location?.longitude) {
-      const distance = getDistanceInKm(
-        newItem.location.latitude,
-        newItem.location.longitude,
-        item.location.latitude,
-        item.location.longitude
-      );
-      if (distance > 1) return false; // Ignore if too far
-    }
+  return (
+    items.find((i) => {
+      if (i.id === item.id) return false;
 
-    // Keyword matching for title
-    const newWords = newItem.title.toLowerCase().split(" ");
-    const itemWords = item.title.toLowerCase().split(" ");
-    const commonWords = newWords.filter(word => itemWords.includes(word));
-    if (commonWords.length > 0) return true;
+      // Ensure opposite status
+      if (
+        (item.status === "Lost" && i.status !== "Found") ||
+        (item.status === "Found" && i.status !== "Lost")
+      )
+        return false;
 
-    return false;
-  }) || null;
+      if (i.category !== item.category) return false;
+
+      const itemWords = clean(i.title);
+
+      // At least 1 common word in title
+      const commonWords = newItemWords.filter((word) => itemWords.includes(word));
+
+      return commonWords.length > 0;
+    }) || null
+  );
 };
