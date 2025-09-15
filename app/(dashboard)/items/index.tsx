@@ -44,7 +44,7 @@ const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) =
   return R * c;
 };
 
-// Image placeholder
+// Image placeholder component
 const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 8 }}>
     {photoURL ? (
@@ -187,7 +187,6 @@ const FoundlyItemsScreen = () => {
   const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
   const [matchedItems, setMatchedItems] = useState<Item[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
@@ -262,7 +261,7 @@ const FoundlyItemsScreen = () => {
     ]);
   };
 
-  // Filters
+  // Apply filters and sort
   const applyFilters = (list: Item[]) => {
     let filtered = list
       .filter((i) => (statusFilter === "All" ? true : i.status === statusFilter))
@@ -382,6 +381,7 @@ const FoundlyItemsScreen = () => {
     );
   };
 
+  // Check nearby and matches
   const handleCheckNearby = () => {
     if (!userLocation) return Alert.alert("Location Error", "User location not available");
 
@@ -412,10 +412,10 @@ const FoundlyItemsScreen = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-100">
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
       {/* Header */}
-      <View className="px-5 py-4 flex-row justify-between items-center bg-white shadow">
-        <Text className="text-2xl font-bold text-gray-900">Foundly</Text>
+      <View style={{ padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#fff" }}>
+        <Text style={{ fontSize: 24, fontWeight: "bold" }}>Foundly</Text>
         <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
       </View>
 
@@ -513,8 +513,6 @@ const FoundlyItemsScreen = () => {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
           <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, position: "relative" }}>
-            
-            {/* Close Button */}
             <TouchableOpacity
               onPress={() => setModalVisible(false)}
               style={{
@@ -569,8 +567,6 @@ const FoundlyItemsScreen = () => {
       <Modal visible={detailModalVisible} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
           <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 16, position: "relative" }}>
-            
-            {/* Close Button */}
             <TouchableOpacity
               onPress={() => setDetailModalVisible(false)}
               style={{
