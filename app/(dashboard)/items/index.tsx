@@ -7,7 +7,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-ic
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
-import { onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore"; // added setDoc
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -158,6 +158,50 @@ const FoundlyItemsScreen = () => {
   const { showLoader, hideLoader } = useLoader();
   const auth = getAuth();
   const currentUser = auth.currentUser;
+
+  // Mark as resolved
+  const handleMarkResolved = async () => {
+    if (!selectedItem?.id) return;
+    try {
+      await updateDoc(doc(itemColRef.firestore, "items", selectedItem.id), { resolved: true });
+      setSelectedItem({ ...selectedItem, resolved: true });
+      setItems((prev) =>
+        prev.map((item) => (item.id === selectedItem.id ? { ...item, resolved: true } : item))
+      );
+      Toast.show({ type: "success", text1: "Item marked as resolved!" });
+    } catch (err) {
+      console.error(err);
+      Alert.alert("Error", "Failed to mark resolved.");
+    }
+  };
+
+  // Report item
+  const handleReport = async (item: Item) => {
+    if (!item.id) return;
+
+    if (Platform.OS === "web") {
+      const reason = prompt("Please provide a reason for reporting this item:");
+      if (!reason) return;
+
+      try {
+        const reportRef = doc(itemColRef.firestore, "reports", `${item.id}_${Date.now()}`);
+        await setDoc(reportRef, {
+          itemId: item.id,
+          title: item.title,
+          reason,
+          reporterId: currentUser?.uid || null,
+          createdAt: new Date(),
+        });
+        Toast.show({ type: "success", text1: "Report submitted successfully!" });
+      } catch (err) {
+        console.error(err);
+        Alert.alert("Error", "Failed to report the item.");
+      }
+    } else {
+      // TODO: Implement Expo prompt/modal for mobile if needed
+      Alert.alert("Report", "Reporting is only implemented for web prompt.");
+    }
+  };
 
   useEffect(() => {
     const getLocation = async () => {
@@ -350,7 +394,7 @@ const FoundlyItemsScreen = () => {
 
           <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
             <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
-              {item.title}
+              {item.title} {item.isVerified ? "✅" : ""}
             </Text>
             <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
               {item.description}
@@ -358,39 +402,56 @@ const FoundlyItemsScreen = () => {
           </View>
         </TouchableOpacity>
 
-        {item.userId === currentUser?.uid && (
-          <View style={{ flexDirection: "row", margin: 8, justifyContent: "space-between" }}>
-            <TouchableOpacity
-              onPress={() => router.push(`/items/${item.id}`)}
-              style={{
-                flex: 1,
-                marginRight: 4,
-                height: 36,
-                borderRadius: 8,
-                backgroundColor: "#FCD34D",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
-            </TouchableOpacity>
+        <View style={{ flexDirection: "row", margin: 8, justifyContent: "space-between" }}>
+          {item.userId === currentUser?.uid ? (
+            <>
+              <TouchableOpacity
+                onPress={() => router.push(`/items/${item.id}`)}
+                style={{
+                  flex: 1,
+                  marginRight: 4,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: "#FCD34D",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                onPress={() => handleDelete(item.id)}
+                style={{
+                  flex: 1,
+                  marginLeft: 4,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: "#EF4444",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
             <TouchableOpacity
-              onPress={() => handleDelete(item.id)}
+              onPress={() => handleReport(item)}
               style={{
                 flex: 1,
                 marginLeft: 4,
                 height: 36,
                 borderRadius: 8,
-                backgroundColor: "#EF4444",
+                backgroundColor: "#F59E0B",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "#fff" }}>Report</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
       </View>
     );
   };
@@ -474,227 +535,136 @@ const FoundlyItemsScreen = () => {
       </TouchableOpacity>
 
       {/* Item Detail Modal */}
-      {/* Item Detail Modal */}
-<Modal visible={detailModalVisible} animationType="slide" transparent>
-  <View
-    style={{
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.4)",
-      justifyContent: "center",
-      alignItems: "center",
-    }}
-  >
-    <View
-      style={{
-        width: "90%",
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        padding: 16,
-        elevation: 5,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-      }}
-    >
-      {/* Close Icon */}
-      <TouchableOpacity
-        onPress={() => setDetailModalVisible(false)}
-        style={{
-          position: "absolute",
-          top: 12,
-          right: 12,
-          zIndex: 10,
-          backgroundColor: "#EF4444",
-          borderRadius: 20,
-          width: 32,
-          height: 32,
-          alignItems: "center",
-          justifyContent: "center",
-          elevation: 3,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.25,
-          shadowRadius: 2,
-        }}
-      >
-        <Ionicons name="close" size={20} color="#fff" />
-      </TouchableOpacity>
-
-      {selectedItem && (
-        <>
-          {/* Item Image */}
-          <Image
-            source={{ uri: selectedItem.photoURL }}
+      <Modal visible={detailModalVisible} animationType="slide" transparent>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.4)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View
             style={{
-              width: "100%",
-              height: 180,
+              width: "90%",
+              backgroundColor: "#fff",
               borderRadius: 16,
-              marginBottom: 12,
+              padding: 16,
+              elevation: 5,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 3.84,
             }}
-            resizeMode="cover"
-          />
-
-          {/* Item Details */}
-          <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
-            {selectedItem.title}
-          </Text>
-          <Text style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
-            {selectedItem.description}
-          </Text>
-          {selectedItem.location && (
-            <Text style={{ marginBottom: 8 }}>
-              Location: {selectedItem.location.lat?.toFixed(4) ?? "N/A"}, {selectedItem.location.lng?.toFixed(4) ?? "N/A"}
-            </Text>
-          )}
-
-          {/* Contact Button */}
-          {selectedItem.contactInfo && (
+          >
+            {/* Close Icon */}
             <TouchableOpacity
+              onPress={() => setDetailModalVisible(false)}
               style={{
-                backgroundColor: "#3B82F6",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                borderRadius: 16,
+                position: "absolute",
+                top: 12,
+                right: 12,
+                zIndex: 10,
+                backgroundColor: "#EF4444",
+                borderRadius: 20,
+                width: 32,
+                height: 32,
                 alignItems: "center",
-                marginBottom: 12,
+                justifyContent: "center",
                 elevation: 3,
                 shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
+                shadowOffset: { width: 0, height: 1 },
                 shadowOpacity: 0.25,
-                shadowRadius: 3.84,
+                shadowRadius: 2,
               }}
-              onPress={() => Linking.openURL(`tel:${selectedItem.contactInfo}`)}
             >
-              <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Call Contact</Text>
+              <Ionicons name="close" size={20} color="#fff" />
             </TouchableOpacity>
-          )}
-        </>
-      )}
-    </View>
-  </View>
-</Modal>
 
-
-      {/* Nearby / Match Modal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center" }}>
-          <View style={{ flex: 0.8, margin: 20, backgroundColor: "#fff", borderRadius: 16, padding: 12 }}>
-            {/* Tabs */}
-            <View style={{ flexDirection: "row", marginBottom: 12 }}>
-              {["Nearby", "Match"].map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  onPress={() => setActiveTab(tab as "Nearby" | "Match")}
+            {selectedItem && (
+              <>
+                {/* Item Image */}
+                <Image
+                  source={{ uri: selectedItem.photoURL }}
                   style={{
-                    flex: 1,
-                    paddingVertical: 8,
-                    backgroundColor: activeTab === tab ? "#3B82F6" : "#E5E7EB",
-                    borderRadius: 12,
-                    marginHorizontal: 4,
-                    alignItems: "center",
+                    width: "100%",
+                    height: 180,
+                    borderRadius: 16,
+                    marginBottom: 12,
                   }}
-                >
-                  <Text style={{ color: activeTab === tab ? "#fff" : "#374151", fontWeight: "bold" }}>{tab}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  resizeMode="cover"
+                />
 
-            {/* Items Grid */}
-            <ScrollView
-              contentContainerStyle={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-                paddingBottom: 20,
-              }}
-            >
-              {(activeTab === "Nearby" ? nearbyItems : matchedItems).length === 0 ? (
-                <Text style={{ textAlign: "center", color: "#6B7280", marginTop: 20, width: "100%" }}>
-                  No items found.
+                {/* Item Details */}
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
+                  {selectedItem.title} {selectedItem.isVerified ? "✅" : ""}
                 </Text>
-              ) : (
-                (activeTab === "Nearby" ? nearbyItems : matchedItems).map((item) => {
-                  const isNearby =
-                    userLocation && item.location?.lat && item.location?.lng
-                      ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
-                      : false;
-                  const isMatched = !!findMatchingItem(item, items);
-                  const ribbons: { color: string; text: string }[] = [];
-                  if (isMatched && isNearby) ribbons.push({ color: "#EF4444", text: "⚡ MATCH & 📍 NEARBY" });
-                  else if (isMatched) ribbons.push({ color: "#FBBF24", text: "⚡ MATCH!" });
-                  else if (isNearby) ribbons.push({ color: "#10B981", text: "📍 NEARBY" });
+                <Text style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
+                  {selectedItem.description}
+                </Text>
+                {selectedItem.location && (
+                  <Text style={{ marginBottom: 8 }}>
+                    Location: {selectedItem.location.lat?.toFixed(4) ?? "N/A"}, {selectedItem.location.lng?.toFixed(4) ?? "N/A"}
+                  </Text>
+                )}
 
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => {
-                        setSelectedItem(item);
-                        setDetailModalVisible(true);
-                      }}
-                      style={{
-                        width: screenWidth / 2 - 20,
-                        backgroundColor: "#fff",
-                        borderRadius: 16,
-                        marginBottom: 12,
-                        overflow: "hidden",
-                        elevation: 2,
-                      }}
-                    >
-                      <View style={{ position: "relative" }}>
-                        <ImagePlaceholder photoURL={item.photoURL} />
-                        {ribbons.map((r, idx) => (
-                          <View
-                            key={idx}
-                            style={{
-                              position: "absolute",
-                              top: 10 + idx * 20,
-                              left: -40,
-                              width: 140,
-                              transform: [{ rotate: "-45deg" }],
-                              backgroundColor: r.color,
-                              paddingVertical: 4,
-                              zIndex: 10,
-                              elevation: 5,
-                            }}
-                          >
-                            <Text style={{ color: "#fff", fontWeight: "bold", textAlign: "center", fontSize: 12 }}>
-                              {r.text}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
+                {/* Contact Button */}
+                {selectedItem.contactInfo && (
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#3B82F6",
+                      paddingVertical: 12,
+                      paddingHorizontal: 20,
+                      borderRadius: 16,
+                      alignItems: "center",
+                      marginBottom: 12,
+                      elevation: 3,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 3.84,
+                    }}
+                    onPress={() => Linking.openURL(`tel:${selectedItem.contactInfo}`)}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Call Contact</Text>
+                  </TouchableOpacity>
+                )}
 
-                      <View style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-                        <Text style={{ fontWeight: "bold", fontSize: 16 }} numberOfLines={1}>
-                          {item.title}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: "#6B7280" }} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                        <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>
-                          {item.category} | {item.status}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
+                {/* Mark as Resolved button */}
+                {selectedItem.userId === currentUser?.uid && !selectedItem.resolved && (
+                  <TouchableOpacity
+                    onPress={handleMarkResolved}
+                    style={{
+                      backgroundColor: "#10B981",
+                      paddingVertical: 12,
+                      paddingHorizontal: 20,
+                      borderRadius: 16,
+                      alignItems: "center",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Mark as Resolved</Text>
+                  </TouchableOpacity>
+                )}
 
-            {/* Close Button */}
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={{
-                backgroundColor: "#EF4444",
-                padding: 10,
-                borderRadius: 12,
-                marginTop: 12,
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "bold" }}>Close</Text>
-            </TouchableOpacity>
+                {/* Report button */}
+                {selectedItem.userId !== currentUser?.uid && (
+                  <TouchableOpacity
+                    onPress={() => handleReport(selectedItem)}
+                    style={{
+                      backgroundColor: "#F59E0B",
+                      paddingVertical: 12,
+                      paddingHorizontal: 20,
+                      borderRadius: 16,
+                      alignItems: "center",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Report Item</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
           </View>
         </View>
       </Modal>
