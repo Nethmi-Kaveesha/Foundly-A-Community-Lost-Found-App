@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext"
-import { Ionicons, MaterialIcons } from "@expo/vector-icons"
+import { Entypo, Ionicons, MaterialIcons } from "@expo/vector-icons"
 import { Tabs, useRouter } from "expo-router"
 import React, { useEffect } from "react"
 import { ActivityIndicator, SafeAreaView, View } from "react-native"
@@ -27,13 +27,18 @@ const FoundlyDashboardLayout = () => {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: "#3B82F6", // Foundly blue
-          tabBarInactiveTintColor: "#6B7280", // Gray
+          tabBarActiveTintColor: "#3B82F6",
+          tabBarInactiveTintColor: "#6B7280",
           tabBarStyle: {
-            backgroundColor: "#F3F4F6", // light gray
+            backgroundColor: "#F9FAFB",
             borderTopWidth: 0,
-            elevation: 5
-          }
+            elevation: 5,
+            paddingVertical: 6,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: "600",
+          },
         }}
       >
         {/* Home Tab */}
@@ -42,19 +47,19 @@ const FoundlyDashboardLayout = () => {
           options={{
             title: "Home",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home" size={size} color={color} />
-            )
+              <Ionicons name="home-outline" size={size} color={color} />
+            ),
           }}
         />
 
-        {/* Items Tab (was Tasks) */}
+        {/* Posts Tab */}
         <Tabs.Screen
-          name="items"
+          name="posts"
           options={{
-            title: "Items",
+            title: "Posts",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="inventory" size={size} color={color} />
-            )
+              <MaterialIcons name="inventory-2" size={size} color={color} />
+            ),
           }}
         />
 
@@ -64,19 +69,30 @@ const FoundlyDashboardLayout = () => {
           options={{
             title: "Profile",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="person" size={size} color={color} />
-            )
+              <MaterialIcons name="person-outline" size={size} color={color} />
+            ),
           }}
         />
 
-        {/* Settings Tab */}
+        {/* Map Tab */}
         <Tabs.Screen
-          name="settings"
+          name="map"
           options={{
-            title: "Settings",
+            title: "Map",
             tabBarIcon: ({ color, size }) => (
-              <MaterialIcons name="settings" size={size} color={color} />
-            )
+              <Ionicons name="map-outline" size={size} color={color} />
+            ),
+          }}
+        />
+
+        {/* Map Picker Tab */}
+        <Tabs.Screen
+          name="map-picker"
+          options={{
+            title: "Map Picker",
+            tabBarIcon: ({ color, size }) => (
+              <Entypo name="location-pin" size={size} color={color} />
+            ),
           }}
         />
       </Tabs>
