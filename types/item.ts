@@ -19,4 +19,8 @@ export interface Item {
   contactInfo?: string;           // Owner contact info
   location?: ItemLocation;        // Item location
   matchedItemId?: string;         // Matched item ID if found
+
+  isVerified?: boolean; // ✅ add this
+
+  resolved?: boolean; // ✅ add this
 }
