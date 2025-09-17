@@ -13,7 +13,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading) {
-      router.push("/login"); // always go to login first
+      router.push("/welcome"); // always go to login first
     }
   }, [loading]);
 
