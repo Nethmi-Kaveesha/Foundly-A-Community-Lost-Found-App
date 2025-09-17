@@ -270,20 +270,33 @@ const ProfileScreen = () => {
 export default ProfileScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F3F4F6" },
+  container: { flex: 1, backgroundColor: "#222831" }, // dark background
   scrollContainer: { padding: 20 },
-  title: { fontSize: 28, fontWeight: "700", marginBottom: 20, color: "#111827" },
+  title: { fontSize: 28, fontWeight: "700", marginBottom: 20, color: "#EEEEEE" },
   avatarContainer: { alignItems: "center", marginBottom: 20 },
-  avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: "#D1D5DB" },
-  changePhotoText: { marginTop: 8, color: "#3B82F6", fontWeight: "600" },
-  label: { fontSize: 16, fontWeight: "600", marginBottom: 6, color: "#111827" },
-  sectionTitle: { fontSize: 18, fontWeight: "700", marginTop: 20, marginBottom: 8, color: "#111827" },
-  input: { backgroundColor: "#fff", padding: 12, borderRadius: 12, fontSize: 16, marginBottom: 16 },
+  avatar: { width: 120, height: 120, borderRadius: 60, backgroundColor: "#393E46" },
+  changePhotoText: { marginTop: 8, color: "#00ADB5", fontWeight: "600" },
+  label: { fontSize: 16, fontWeight: "600", marginBottom: 6, color: "#EEEEEE" },
+  sectionTitle: { fontSize: 18, fontWeight: "700", marginTop: 20, marginBottom: 8, color: "#EEEEEE" },
+  input: { backgroundColor: "#393E46", padding: 12, borderRadius: 12, fontSize: 16, marginBottom: 16, color: "#EEEEEE" },
   passwordContainer: { position: "relative" },
   showHideButton: { position: "absolute", right: 18, top: 14 },
-  showHideText: { color: "#3B82F6", fontWeight: "600" },
+  showHideText: { color: "#00ADB5", fontWeight: "600" },
   toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  toggleText: { fontSize: 16, fontWeight: "600" },
-  saveButton: { backgroundColor: "#10B981", padding: 16, borderRadius: 12, alignItems: "center", marginTop: 10 },
-  saveButtonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  toggleText: { fontSize: 16, fontWeight: "600", color: "#EEEEEE" },
+  saveButton: {
+    backgroundColor: "#00ADB5",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+    // shadow for iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    // shadow for Android
+    elevation: 6,
+  },
+  saveButtonText: { color: "#222831", fontWeight: "700", fontSize: 16 },
 });
