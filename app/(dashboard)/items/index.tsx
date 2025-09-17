@@ -7,7 +7,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-ic
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { getAuth } from "firebase/auth";
-import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore"; // added setDoc
+import { doc, onSnapshot, setDoc, updateDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -27,7 +27,6 @@ import Toast from "react-native-toast-message";
 
 const screenWidth = Dimensions.get("window").width;
 
-// Distance calculation
 const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -45,23 +44,19 @@ const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) =
 const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
   <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 8 }}>
     {photoURL ? (
-      <Image
-        source={{ uri: photoURL }}
-        style={{ width: "100%", height: 120, borderRadius: 12 }}
-        resizeMode="cover"
-      />
+      <Image source={{ uri: photoURL }} style={{ width: "100%", height: 120, borderRadius: 12 }} resizeMode="cover" />
     ) : (
       <View
         style={{
           width: "100%",
           height: 120,
           borderRadius: 12,
-          backgroundColor: "#E5E7EB",
+          backgroundColor: "#EEEEEE",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Ionicons name="image-outline" size={36} color="#9CA3AF" />
+        <Ionicons name="image-outline" size={36} color="#393E46" />
       </View>
     )}
   </View>
@@ -69,10 +64,10 @@ const ImagePlaceholder = ({ photoURL }: { photoURL?: string }) => (
 
 // Categories
 const categories = [
-  { label: "Pets", icon: <Ionicons name="paw-outline" size={16} color="#fff" /> },
-  { label: "Electronics", icon: <MaterialCommunityIcons name="laptop" size={16} color="#fff" /> },
-  { label: "Bags", icon: <Ionicons name="briefcase-outline" size={16} color="#fff" /> },
-  { label: "Keys", icon: <Ionicons name="key-outline" size={16} color="#fff" /> },
+  { label: "Pets", icon: <Ionicons name="paw-outline" size={16} color="#00ADB5" /> },
+  { label: "Electronics", icon: <MaterialCommunityIcons name="laptop" size={16} color="#00ADB5" /> },
+  { label: "Bags", icon: <Ionicons name="briefcase-outline" size={16} color="#00ADB5" /> },
+  { label: "Keys", icon: <Ionicons name="key-outline" size={16} color="#00ADB5" /> },
 ];
 
 const CategoryFilter = ({
@@ -92,7 +87,7 @@ const CategoryFilter = ({
           style={{
             flexDirection: "row",
             alignItems: "center",
-            backgroundColor: isSelected ? "#3B82F6" : "#E5E7EB",
+            backgroundColor: isSelected ? "#888888" : "#D8D8D8",
             paddingHorizontal: 12,
             paddingVertical: 6,
             borderRadius: 20,
@@ -100,9 +95,7 @@ const CategoryFilter = ({
           }}
         >
           {cat.icon}
-          <Text style={{ color: isSelected ? "#fff" : "#374151", fontWeight: "500", marginLeft: 6 }}>
-            {cat.label}
-          </Text>
+          <Text style={{ color: isSelected ? "#222831" : "#393E46", fontWeight: "500", marginLeft: 6 }}>{cat.label}</Text>
         </TouchableOpacity>
       );
     })}
@@ -126,14 +119,14 @@ const StatusToggle = ({
             key={status}
             onPress={() => setStatusFilter(status)}
             style={{
-              backgroundColor: isSelected ? "#3B82F6" : "#E5E7EB",
+              backgroundColor: isSelected ? "#00ADB5" : "#EEEEEE",
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 20,
               marginRight: 8,
             }}
           >
-            <Text style={{ color: isSelected ? "#fff" : "#374151", fontWeight: "500" }}>{status}</Text>
+            <Text style={{ color: isSelected ? "#222831" : "#393E46", fontWeight: "500" }}>{status}</Text>
           </TouchableOpacity>
         );
       })}
@@ -147,8 +140,7 @@ const FoundlyItemsScreen = () => {
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<"Nearby" | "Match">("Nearby");
+  const [modalVisible, setModalVisible] = useState(false); // Nearby/Match modal
   const [nearbyItems, setNearbyItems] = useState<Item[]>([]);
   const [matchedItems, setMatchedItems] = useState<Item[]>([]);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
@@ -159,7 +151,6 @@ const FoundlyItemsScreen = () => {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Mark as resolved
   const handleMarkResolved = async () => {
     if (!selectedItem?.id) return;
     try {
@@ -175,14 +166,11 @@ const FoundlyItemsScreen = () => {
     }
   };
 
-  // Report item
   const handleReport = async (item: Item) => {
     if (!item.id) return;
-
     if (Platform.OS === "web") {
       const reason = prompt("Please provide a reason for reporting this item:");
       if (!reason) return;
-
       try {
         const reportRef = doc(itemColRef.firestore, "reports", `${item.id}_${Date.now()}`);
         await setDoc(reportRef, {
@@ -198,7 +186,6 @@ const FoundlyItemsScreen = () => {
         Alert.alert("Error", "Failed to report the item.");
       }
     } else {
-      // TODO: Implement Expo prompt/modal for mobile if needed
       Alert.alert("Report", "Reporting is only implemented for web prompt.");
     }
   };
@@ -276,7 +263,6 @@ const FoundlyItemsScreen = () => {
             i.description.toLowerCase().includes(searchKeyword.toLowerCase())
           : true
       );
-
     if (userLocation) {
       filtered = filtered.sort((a, b) => {
         const distA =
@@ -290,7 +276,6 @@ const FoundlyItemsScreen = () => {
         return distA - distB;
       });
     }
-
     return filtered;
   };
 
@@ -329,7 +314,6 @@ const FoundlyItemsScreen = () => {
 
     setNearbyItems(nearby);
     setMatchedItems(matched);
-    setActiveTab(matched.length > 0 ? "Match" : "Nearby");
     setModalVisible(true);
   };
 
@@ -339,138 +323,124 @@ const FoundlyItemsScreen = () => {
         ? getDistanceKm(userLocation.lat, userLocation.lng, item.location.lat, item.location.lng) <= 5
         : false;
     const isMatched = !!findMatchingItem(item, items);
-    const isSearchMatch =
-      searchKeyword &&
-      (item.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchKeyword.toLowerCase()));
 
     const ribbons: { color: string; text: string }[] = [];
-    if (isMatched && isNearby) ribbons.push({ color: "#EF4444", text: "⚡ MATCH & 📍 NEARBY" });
-    else if (isMatched) ribbons.push({ color: "#FBBF24", text: "⚡ MATCH!" });
-    else if (isNearby) ribbons.push({ color: "#10B981", text: "📍 NEARBY" });
-    if (isSearchMatch) ribbons.push({ color: "#3B82F6", text: "🔍 Keyword" });
+    if (isMatched && isNearby) ribbons.push({ color: "#00ADB5", text: "⚡ MATCH & 📍 NEARBY" });
+    else if (isMatched) ribbons.push({ color: "#00ADB5", text: "⚡ MATCH!" });
+    else if (isNearby) ribbons.push({ color: "#00ADB5", text: "📍 NEARBY" });
 
     return (
-      <View
+      <TouchableOpacity
         key={item.id}
+        onPress={() => {
+          setSelectedItem(item);
+          setDetailModalVisible(true);
+        }}
         style={{
-          width: screenWidth / 2 - 20,
-          backgroundColor: "#fff",
+          flexDirection: "row",
+          backgroundColor: "#222831",
           borderRadius: 16,
           marginBottom: 12,
           overflow: "hidden",
           elevation: 3,
+          width: "100%",
+          padding: 8,
         }}
       >
-        <TouchableOpacity
-          onPress={() => {
-            setSelectedItem(item);
-            setDetailModalVisible(true);
-          }}
-        >
-          <View style={{ position: "relative" }}>
-            <ImagePlaceholder photoURL={item.photoURL} />
+        <Image source={{ uri: item.photoURL }} style={{ width: 120, height: 120, borderRadius: 12 }} resizeMode="cover" />
+        <View style={{ flex: 1, marginLeft: 12, justifyContent: "space-between" }}>
+          <View>
+            <Text style={{ fontWeight: "bold", fontSize: 16, color: "#EEEEEE" }}>
+              {item.title} {item.isVerified ? "✅" : ""}
+            </Text>
+            <Text style={{ fontSize: 14, color: "#00ADB5", marginTop: 4 }} numberOfLines={3}>
+              {item.description}
+            </Text>
             {ribbons.map((r, idx) => (
               <View
                 key={idx}
                 style={{
-                  position: "absolute",
-                  top: 10 + idx * 20,
-                  left: -40,
-                  width: 140,
-                  transform: [{ rotate: "-45deg" }],
                   backgroundColor: r.color,
-                  paddingVertical: 4,
-                  zIndex: 10,
-                  elevation: 5,
+                  paddingVertical: 2,
+                  paddingHorizontal: 6,
+                  borderRadius: 8,
+                  marginTop: 4,
+                  alignSelf: "flex-start",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "bold", textAlign: "center", fontSize: 12 }}>
-                  {r.text}
-                </Text>
+                <Text style={{ color: "#222831", fontSize: 12 }}>{r.text}</Text>
               </View>
             ))}
           </View>
 
-          <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
-            <Text style={{ fontWeight: "bold", fontSize: 16, textAlign: "center" }} numberOfLines={1}>
-              {item.title} {item.isVerified ? "✅" : ""}
-            </Text>
-            <Text style={{ fontSize: 12, color: "#6B7280", textAlign: "center" }} numberOfLines={2}>
-              {item.description}
-            </Text>
+          <View style={{ flexDirection: "row", marginTop: 8, justifyContent: "flex-end" }}>
+            {item.userId === currentUser?.uid ? (
+              <>
+                <TouchableOpacity
+                  onPress={() => router.push(`/items/${item.id}`)}
+                  style={{
+                    marginRight: 4,
+                    padding: 6,
+                    borderRadius: 8,
+                    backgroundColor: "#00ADB5",
+                  }}
+                >
+                  <MaterialIcons name="edit" size={20} color="#222831" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDelete(item.id)}
+                  style={{
+                    marginLeft: 4,
+                    padding: 6,
+                    borderRadius: 8,
+                    backgroundColor: "#EF4444",
+                  }}
+                >
+                  <MaterialIcons name="delete" size={20} color="#fff" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                onPress={() => handleReport(item)}
+                style={{
+                  padding: 6,
+                  borderRadius: 8,
+                  backgroundColor: "#00ADB5",
+                }}
+              >
+                <MaterialIcons name="report" size={20} color="#222831" />
+              </TouchableOpacity>
+            )}
           </View>
-        </TouchableOpacity>
-
-        <View style={{ flexDirection: "row", margin: 8, justifyContent: "space-between" }}>
-          {item.userId === currentUser?.uid ? (
-            <>
-              <TouchableOpacity
-                onPress={() => router.push(`/items/${item.id}`)}
-                style={{
-                  flex: 1,
-                  marginRight: 4,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: "#FCD34D",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>Edit</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => handleDelete(item.id)}
-                style={{
-                  flex: 1,
-                  marginLeft: 4,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: "#EF4444",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: "600", color: "white" }}>Delete</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity
-              onPress={() => handleReport(item)}
-              style={{
-                flex: 1,
-                marginLeft: 4,
-                height: 36,
-                borderRadius: 8,
-                backgroundColor: "#F59E0B",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ fontSize: 12, fontWeight: "600", color: "#fff" }}>Report</Text>
-            </TouchableOpacity>
-          )}
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView edges={["bottom"]} className="flex-1 bg-gray-100">
+    <SafeAreaView edges={["bottom"]} style={{ flex: 1, backgroundColor: "#222831" }}>
       {/* Header */}
-      <View className="px-5 py-4 flex-row justify-between items-center bg-white shadow">
-        <Text className="text-2xl font-bold text-gray-900">Foundly</Text>
-        <Ionicons name="person-circle-outline" size={36} color="#3B82F6" />
+      <View
+        style={{
+          padding: 20,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          backgroundColor: "#393E46",
+        }}
+      >
+        <Text style={{ fontSize: 24, fontWeight: "bold", color: "#EEEEEE" }}>Foundly</Text>
+        <Ionicons name="person-circle-outline" size={36} color="#00ADB5" />
       </View>
 
       {/* Search */}
       <View style={{ padding: 10 }}>
         <TextInput
           placeholder="Search items..."
+          placeholderTextColor="#00ADB5"
           value={searchKeyword}
           onChangeText={setSearchKeyword}
-          style={{ backgroundColor: "#fff", padding: 10, borderRadius: 12 }}
+          style={{ backgroundColor: "#393E46", padding: 10, borderRadius: 12, color: "#EEEEEE" }}
         />
       </View>
 
@@ -483,13 +453,25 @@ const FoundlyItemsScreen = () => {
       {/* Check Nearby / Match */}
       <View style={{ padding: 10 }}>
         <TouchableOpacity onPress={handleCheckNearby} disabled={!userLocation || items.length === 0} activeOpacity={0.8}>
+          
           <LinearGradient
-            colors={["#34D399", "#10B981"]}
-            start={[0, 0]}
-            end={[1, 0]}
-            style={{ padding: 14, borderRadius: 12, alignItems: "center" }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Check Nearby / Match</Text>
+      colors={["#181818", "#00ADB5"]} // gradient from black to blue
+      start={[0, 0]}
+      end={[1, 0]}
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        alignItems: "center",
+        // Shadow for iOS
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 }, // shadow below
+        shadowOpacity: 0.5,
+        shadowRadius: 4,
+        // Shadow for Android
+        elevation: 6,
+      }}
+    >
+            <Text style={{ color: "white", fontWeight: "bold" }}>Check Nearby / Match</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -499,19 +481,16 @@ const FoundlyItemsScreen = () => {
         contentContainerStyle={{
           paddingHorizontal: 10,
           paddingBottom: 180,
-          flexDirection: "row",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
         }}
         keyboardShouldPersistTaps="handled"
       >
         {filteredItems.length === 0 ? (
           <View style={{ width: "100%", alignItems: "center", marginTop: 50 }}>
-            <Ionicons name="happy-outline" size={64} color="#9CA3AF" />
-            <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 16 }}>No items found!</Text>
+            <Ionicons name="happy-outline" size={64} color="#00ADB5" />
+            <Text style={{ marginTop: 12, color: "#00ADB5", fontSize: 16 }}>No items found!</Text>
           </View>
         ) : (
-          filteredItems.map(renderItemCard)
+          filteredItems.map((item) => <View key={item.id}>{renderItemCard(item)}</View>)
         )}
       </ScrollView>
 
@@ -519,9 +498,9 @@ const FoundlyItemsScreen = () => {
       <TouchableOpacity
         style={{
           position: "absolute",
-          bottom: 20,
+          bottom: 90,
           right: 20,
-          backgroundColor: "#3B82F6",
+          backgroundColor: "#00ADB5",
           width: 64,
           height: 64,
           borderRadius: 32,
@@ -531,51 +510,34 @@ const FoundlyItemsScreen = () => {
         }}
         onPress={() => router.push("/items/new")}
       >
-        <MaterialIcons name="add" size={32} color="white" />
+        <MaterialIcons name="add" size={32} color="#222831" />
       </TouchableOpacity>
 
-      {/* Item Detail Modal */}
+      {/* ------------------ Detail Modal ------------------ */}
       <Modal visible={detailModalVisible} animationType="slide" transparent>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.4)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}>
           <View
             style={{
               width: "90%",
-              backgroundColor: "#fff",
+              backgroundColor: "#393E46",
               borderRadius: 16,
               padding: 16,
               elevation: 5,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 3.84,
             }}
           >
-            {/* Close Icon */}
             <TouchableOpacity
               onPress={() => setDetailModalVisible(false)}
               style={{
                 position: "absolute",
                 top: 12,
                 right: 12,
-                zIndex: 10,
                 backgroundColor: "#EF4444",
                 borderRadius: 20,
                 width: 32,
                 height: 32,
                 alignItems: "center",
                 justifyContent: "center",
-                elevation: 3,
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.25,
-                shadowRadius: 2,
+                zIndex: 10,
               }}
             >
               <Ionicons name="close" size={20} color="#fff" />
@@ -586,56 +548,47 @@ const FoundlyItemsScreen = () => {
                 {/* Item Image */}
                 <Image
                   source={{ uri: selectedItem.photoURL }}
-                  style={{
-                    width: "100%",
-                    height: 180,
-                    borderRadius: 16,
-                    marginBottom: 12,
-                  }}
-                  resizeMode="cover"
+                  style={{ width: "100%", height: 180, borderRadius: 16, marginBottom: 12 }}
                 />
 
-                {/* Item Details */}
-                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8 }}>
+                {/* Item Title */}
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 8, color: "#EEEEEE" }}>
                   {selectedItem.title} {selectedItem.isVerified ? "✅" : ""}
                 </Text>
-                <Text style={{ fontSize: 14, color: "#374151", marginBottom: 8 }}>
-                  {selectedItem.description}
-                </Text>
+
+                {/* Description */}
+                <Text style={{ fontSize: 14, color: "#00ADB5", marginBottom: 8 }}>{selectedItem.description}</Text>
+
+                {/* Location */}
                 {selectedItem.location && (
-                  <Text style={{ marginBottom: 8 }}>
-                    Location: {selectedItem.location.lat?.toFixed(4) ?? "N/A"}, {selectedItem.location.lng?.toFixed(4) ?? "N/A"}
+                  <Text style={{ marginBottom: 8, color: "#EEEEEE" }}>
+                    Location: {selectedItem.location.lat?.toFixed(4)}, {selectedItem.location.lng?.toFixed(4)}
                   </Text>
                 )}
 
-                {/* Contact Button */}
+                {/* Contact */}
                 {selectedItem.contactInfo && (
                   <TouchableOpacity
                     style={{
-                      backgroundColor: "#3B82F6",
+                      backgroundColor: "#00ADB5",
                       paddingVertical: 12,
                       paddingHorizontal: 20,
                       borderRadius: 16,
                       alignItems: "center",
                       marginBottom: 12,
-                      elevation: 3,
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.25,
-                      shadowRadius: 3.84,
                     }}
                     onPress={() => Linking.openURL(`tel:${selectedItem.contactInfo}`)}
                   >
-                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Call Contact</Text>
+                    <Text style={{ color: "#222831", fontWeight: "bold", fontSize: 16 }}>Call Contact</Text>
                   </TouchableOpacity>
                 )}
 
-                {/* Mark as Resolved button */}
+                {/* Mark Resolved */}
                 {selectedItem.userId === currentUser?.uid && !selectedItem.resolved && (
                   <TouchableOpacity
                     onPress={handleMarkResolved}
                     style={{
-                      backgroundColor: "#10B981",
+                      backgroundColor: "#00ADB5",
                       paddingVertical: 12,
                       paddingHorizontal: 20,
                       borderRadius: 16,
@@ -643,11 +596,11 @@ const FoundlyItemsScreen = () => {
                       marginBottom: 12,
                     }}
                   >
-                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Mark as Resolved</Text>
+                    <Text style={{ color: "#222831", fontWeight: "bold", fontSize: 16 }}>Mark as Resolved</Text>
                   </TouchableOpacity>
                 )}
 
-                {/* Report button */}
+                {/* Report */}
                 {selectedItem.userId !== currentUser?.uid && (
                   <TouchableOpacity
                     onPress={() => handleReport(selectedItem)}
@@ -660,7 +613,7 @@ const FoundlyItemsScreen = () => {
                       marginBottom: 12,
                     }}
                   >
-                    <Text style={{ color: "#fff", fontWeight: "bold", fontSize: 16 }}>Report Item</Text>
+                    <Text style={{ color: "#222831", fontWeight: "bold", fontSize: 16 }}>Report Item</Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -668,6 +621,71 @@ const FoundlyItemsScreen = () => {
           </View>
         </View>
       </Modal>
+      {/* ---------------------------------------------------- */}
+
+      {/* ------------------ Nearby / Match Modal ------------------ */}
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" }}>
+          <View
+            style={{
+              width: "90%",
+              backgroundColor: "#393E46",
+              borderRadius: 16,
+              padding: 16,
+              elevation: 5,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 12,
+                backgroundColor: "#EF4444",
+                borderRadius: 20,
+                width: 32,
+                height: 32,
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 10,
+              }}
+            >
+              <Ionicons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 12, color: "#EEEEEE" }}>
+              Nearby Items
+            </Text>
+            <ScrollView style={{ maxHeight: 200, marginBottom: 12 }}>
+              {nearbyItems.length === 0 ? (
+                <Text style={{ color: "#00ADB5" }}>No nearby items found.</Text>
+              ) : (
+                nearbyItems.map((item) => (
+                  <Text key={item.id} style={{ color: "#EEEEEE", marginBottom: 4 }}>
+                    {item.title} ({item.category})
+                  </Text>
+                ))
+              )}
+            </ScrollView>
+
+            <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 12, color: "#EEEEEE" }}>
+              Matched Items
+            </Text>
+            <ScrollView style={{ maxHeight: 200 }}>
+              {matchedItems.length === 0 ? (
+                <Text style={{ color: "#00ADB5" }}>No matched items found.</Text>
+              ) : (
+                matchedItems.map((item) => (
+                  <Text key={item.id} style={{ color: "#EEEEEE", marginBottom: 4 }}>
+                    {item.title} ({item.category})
+                  </Text>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      {/* ---------------------------------------------------- */}
 
       <Toast />
     </SafeAreaView>
