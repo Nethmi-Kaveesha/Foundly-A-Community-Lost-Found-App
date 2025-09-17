@@ -1,11 +1,19 @@
 import { db } from "@/firebase";
 import type { Item } from "@/types/item";
+import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import { collection, getDocs } from "firebase/firestore";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
 import type { MapPickerProps } from "./MapPicker.types";
+
+const palette = {
+  dark: "#222831",
+  darker: "#393E46",
+  accent: "#00ADB5",
+  light: "#EEEEEE",
+};
 
 const MapPickerMobile: React.FC<MapPickerProps> = ({
   location,
@@ -18,7 +26,6 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
   const webviewRef = useRef<WebView>(null);
   const [searchInput, setSearchInput] = useState("");
 
-  // Fill address text
   const fillAddress = async (lat: number, lng: number) => {
     try {
       const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
@@ -39,7 +46,6 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
     }
   }, [location]);
 
-  // Fetch nearby lost/found items from Firestore
   const fetchNearbyItems = async (lat: number, lng: number, radiusKm = 5) => {
     const itemsCol = collection(db, "items");
     const snap = await getDocs(itemsCol);
@@ -75,7 +81,6 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  // Handle search
   const handleSearch = async () => {
     if (!searchInput.trim()) return Alert.alert("Error", "Please type a location");
     try {
@@ -150,16 +155,17 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
   `;
 
   return (
-    <View style={{ flex: 1 }}>
+    <LinearGradient colors={[palette.dark, palette.darker]} style={{ flex: 1 }}>
       <View style={styles.searchContainer}>
         <TextInput
           placeholder="Search location"
+          placeholderTextColor={palette.light}
           value={searchInput}
           onChangeText={setSearchInput}
           style={styles.input}
         />
         <TouchableOpacity onPress={handleSearch} style={styles.button}>
-          <Text style={{ color: "#fff", fontWeight: "600" }}>Go</Text>
+          <Text style={{ color: palette.light, fontWeight: "600" }}>Go</Text>
         </TouchableOpacity>
       </View>
 
@@ -167,7 +173,7 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
         ref={webviewRef}
         originWhitelist={["*"]}
         source={{ html }}
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: palette.darker }}
         onMessage={(event) => {
           const coords = JSON.parse(event.nativeEvent.data);
           if(coords.lat && coords.lng) {
@@ -176,7 +182,7 @@ const MapPickerMobile: React.FC<MapPickerProps> = ({
           }
         }}
       />
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -184,21 +190,23 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     padding: 8,
-    backgroundColor: "#fff",
+    backgroundColor: "rgba(57,62,70,0.9)",
     borderBottomWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: "#222831",
   },
   input: {
     flex: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: "#00ADB5",
     borderRadius: 12,
     marginRight: 8,
+    color: "#EEEEEE",
+    backgroundColor: "#393E46",
   },
   button: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#00ADB5",
     paddingHorizontal: 16,
     borderRadius: 12,
     justifyContent: "center",
