@@ -24,18 +24,7 @@ export default {
 			output: "static",
 			favicon: "app/assets/images/favicon.png",
 		},
-		plugins: [
-			"expo-router",
-			[
-				"expo-splash-screen",
-						{
-							image: "app/assets/images/splash-icon.png",
-					imageWidth: 200,
-					resizeMode: "contain",
-					backgroundColor: "#ffffff",
-				},
-			],
-		],
+		// plugins removed temporarily to avoid local expo config resolution issues
 		experiments: {
 			typedRoutes: true,
 		},
