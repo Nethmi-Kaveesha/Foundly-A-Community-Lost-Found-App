@@ -30,6 +30,10 @@
       },
       "android": {
         "buildType": "app-bundle"
+      },
+      "node": "20.11.1",
+      "cache": {
+        "clear": true
       }
     }
   },
