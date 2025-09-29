@@ -26,7 +26,9 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "LIGHTNINGCSS_USE_WASM": "1"
+        "LIGHTNINGCSS_USE_WASM": "1",
+        "NPM_CONFIG_LOGLEVEL": "verbose",
+        "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
       },
       "android": {
         "buildType": "app-bundle"
