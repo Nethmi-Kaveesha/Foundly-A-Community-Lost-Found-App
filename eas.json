@@ -31,10 +31,7 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "node": "20.11.1",
-      "cache": {
-        "clear": true
-      }
+      "node": "20.11.1"
     }
   },
   "submit": {
