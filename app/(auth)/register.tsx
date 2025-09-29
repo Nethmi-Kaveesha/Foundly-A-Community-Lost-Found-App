@@ -1,4 +1,6 @@
 import { register } from "@/services/authService";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -16,10 +18,10 @@ import {
 
 const Register = () => {
   const router = useRouter();
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [cPassword, setCPassword] = useState<string>("");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [cPassword, setCPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showCPassword, setShowCPassword] = useState(false);
 
@@ -57,81 +59,100 @@ const Register = () => {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
+    <LinearGradient
+      colors={["#EEEEEE", "#222831", "#393E46", "#00ADB5"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
     >
-      <View style={styles.card}>
-        <Text style={styles.title}>Foundly</Text>
-        <Text style={styles.subtitle}>A Community Lost & Found App</Text>
-        <Text style={styles.sectionTitle}>Create your account</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <View style={styles.card}>
+          <Text style={styles.title}>Foundly</Text>
+          <Text style={styles.subtitle}>A Community Lost & Found App</Text>
+          <Text style={styles.sectionTitle}>Create your account</Text>
 
-        <TextInput
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor="#9CA3AF"
-          style={styles.input}
-        />
+          <View style={styles.inputContainer}>
+            <Ionicons name="mail-outline" size={20} color="#00ADB5" style={styles.icon} />
+            <TextInput
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+            />
+          </View>
 
-        <View style={styles.passwordContainer}>
-          <TextInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            placeholderTextColor="#9CA3AF"
-            style={styles.input}
-          />
-          <Pressable
-            style={styles.showHideButton}
-            onPress={() => setShowPassword(!showPassword)}
-          >
-            <Text style={styles.showHideText}>{showPassword ? "Hide" : "Show"}</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color="#00ADB5" style={styles.icon} />
+            <TextInput
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+            />
+            <Pressable
+              style={styles.showHideButton}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={22}
+                color="#00ADB5"
+              />
+            </Pressable>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Ionicons name="lock-closed-outline" size={20} color="#00ADB5" style={styles.icon} />
+            <TextInput
+              placeholder="Confirm Password"
+              value={cPassword}
+              onChangeText={setCPassword}
+              secureTextEntry={!showCPassword}
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
+            />
+            <Pressable
+              style={styles.showHideButton}
+              onPress={() => setShowCPassword(!showCPassword)}
+            >
+              <Ionicons
+                name={showCPassword ? "eye-off" : "eye"}
+                size={22}
+                color="#00ADB5"
+              />
+            </Pressable>
+          </View>
+
+          <TouchableOpacity onPress={handleRegister} style={styles.registerButton} disabled={isLoading}>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" size="large" />
+            ) : (
+              <Text style={styles.registerButtonText}>Sign Up</Text>
+            )}
+          </TouchableOpacity>
+
+          <Pressable onPress={() => router.back()} style={styles.loginContainer}>
+            <Text style={styles.loginText}>
+              Already have an account? <Text style={styles.loginLink}>Login</Text>
+            </Text>
           </Pressable>
         </View>
-
-        <View style={styles.passwordContainer}>
-          <TextInput
-            placeholder="Confirm Password"
-            value={cPassword}
-            onChangeText={setCPassword}
-            secureTextEntry={!showCPassword}
-            placeholderTextColor="#9CA3AF"
-            style={styles.input}
-          />
-          <Pressable
-            style={styles.showHideButton}
-            onPress={() => setShowCPassword(!showCPassword)}
-          >
-            <Text style={styles.showHideText}>{showCPassword ? "Hide" : "Show"}</Text>
-          </Pressable>
-        </View>
-
-        <TouchableOpacity onPress={handleRegister} style={styles.registerButton}>
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" size="large" />
-          ) : (
-            <Text style={styles.registerButtonText}>Sign Up</Text>
-          )}
-        </TouchableOpacity>
-
-        <Pressable onPress={() => router.back()} style={styles.loginContainer}>
-          <Text style={styles.loginText}>
-            Already have an account? <Text style={styles.loginLink}>Login</Text>
-          </Text>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
@@ -139,80 +160,84 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 28,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 24,
+    padding: 32,
+    shadowColor: "#00ADB5",
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 10,
   },
   title: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: "bold",
-    color: "#8B5CF6",
+    color: "#00ADB5",
     marginBottom: 4,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 16,
-    color: "#6B7280",
-    marginBottom: 16,
+    color: "#222831",
+    marginBottom: 24,
     textAlign: "center",
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
-    color: "#111827",
+    color: "#222831",
+    marginBottom: 20,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#00ADB5",
+    paddingHorizontal: 12,
+  },
+  icon: {
+    marginRight: 8,
   },
   input: {
-    width: "100%",
-    backgroundColor: "#F3F4F6",
-    borderColor: "#D1D5DB",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+    flex: 1,
+    height: 50,
     fontSize: 16,
-    color: "#111827",
-    marginBottom: 16,
-  },
-  passwordContainer: {
-    position: "relative",
+    color: "#222831",
   },
   showHideButton: {
-    position: "absolute",
-    right: 18,
-    top: 16,
-  },
-  showHideText: {
-    color: "#8B5CF6",
-    fontWeight: "600", // string instead of number
+    padding: 4,
   },
   registerButton: {
     width: "100%",
-    backgroundColor: "#8B5CF6",
+    backgroundColor: "#00ADB5",
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 20,
     alignItems: "center",
     marginBottom: 16,
+    shadowColor: "#00ADB5",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
   },
   registerButtonText: {
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "700",
+    letterSpacing: 1,
   },
   loginContainer: {
     alignItems: "center",
   },
   loginText: {
     fontSize: 16,
-    color: "#6B7280",
+    color: "#222831",
   },
   loginLink: {
-    color: "#F59E0B",
+    color: "#00ADB5",
     fontWeight: "700",
   },
 });

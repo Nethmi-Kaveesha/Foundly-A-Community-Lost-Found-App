@@ -1,22 +1,50 @@
 export default {
-  expo: {
-    name: "Foundly",           // App display name
-    slug: "foundly",           // Project slug
-    scheme: "foundly",         // Linking scheme
-    version: "1.0.0",
-    platforms: ["ios", "android", "web"],
-    extra: {
-      mockApi: process.env.EXPO_BASE_URL,
-    },
-    ios: {
-      bundleIdentifier: "com.yourname.foundly",
-      supportsTablet: true,
-    },
-    android: {
-      package: "com.yourname.foundly",
-    },
-    web: {
-      favicon: "./assets/favicon.png",
-    },
-  },
+	expo: {
+		name: "Foundly",
+		slug: "foundly",
+		version: "1.0.0",
+		orientation: "portrait",
+		icon: "app/assets/images/icon.png",
+		scheme: "foundly",
+		userInterfaceStyle: "automatic",
+		newArchEnabled: true,
+		ios: {
+			supportsTablet: true,
+		},
+		android: {
+					package: "com.nethmikaveeshafernando.foundlyapp",
+					adaptiveIcon: {
+						foregroundImage: "app/assets/images/adaptive-icon.png",
+						backgroundColor: "#ffffff",
+					},
+			edgeToEdgeEnabled: true,
+		},
+		web: {
+			bundler: "metro",
+			output: "static",
+			favicon: "app/assets/images/favicon.png",
+		},
+		plugins: [
+			"expo-router",
+			[
+				"expo-splash-screen",
+						{
+							image: "app/assets/images/splash-icon.png",
+					imageWidth: 200,
+					resizeMode: "contain",
+					backgroundColor: "#ffffff",
+				},
+			],
+		],
+		experiments: {
+			typedRoutes: true,
+		},
+		extra: {
+			router: {},
+			eas: {
+				projectId: "c96b8e09-f9dd-44b5-8911-f4329b4d18d1",
+			},
+		},
+	},
 };
+
