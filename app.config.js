@@ -24,7 +24,7 @@ export default {
 			output: "static",
 			favicon: "app/assets/images/favicon.png",
 		},
-		// plugins removed temporarily to avoid local expo config resolution issues
+		plugins: ["expo-router"],
 		experiments: {
 			typedRoutes: true,
 		},
